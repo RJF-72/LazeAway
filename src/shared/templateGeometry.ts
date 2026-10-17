@@ -2,16 +2,32 @@
 //
 // The template catalog (texasTemplates.json) is metadata only. This module
 // supplies real, cuttable vector geometry (polylines in machine coordinates,
-// mm, centered at the bed origin, y-up) for the templates whose shapes can be
-// constructed exactly: the Texas outline family, stars, rosettes, fretboard
-// inlays (true fret math), and simple iconic shapes.
+// mm, centered at the bed origin, y-up) for every template: exact procedural
+// shapes (Texas outline family, stars, rosette, fretboard inlays with true
+// fret math, rope/text/mandala pieces) plus vectorized line artwork
+// (artworkVectors.ts) composed with the Texas outline.
 //
-// Templates whose artwork is genuinely artistic (longhorn, bluebonnets,
-// filigree, treble clef, ...) return null from geometryForTemplate() — the UI
-// must show "vector artwork pending" and refuse to START rather than cut the
-// wrong shape.
+// geometryForTemplate() returns null only if a template truly has no art.
 import { texasPoints, mergeCollinear } from './texasPath'
 import type { Pt } from './texasPath'
+import {
+  ART_7_LONGHORN,
+  ART_8_BOUQUET,
+  ART_10_ROPE,
+  ART_11_TREBLE,
+  ART_12_GUITAR,
+  ART_16_TEXT,
+  ART_19_BAROQUE,
+  ART_20_MANDALA,
+  ART_22_FILIGREE,
+  ART_23_WREATH,
+  type ArtGeom,
+} from './artworkVectors'
+
+function artGeom(g: ArtGeom, note: string): TemplateGeometry {
+  const paths: Pt[][] = g.paths.map((path) => path.map(([x, y]) => ({ x, y })))
+  return make(paths, g.closed, note)
+}
 
 export interface Bounds {
   minX: number
@@ -372,13 +388,32 @@ export function geometryForTemplate(id: number): TemplateGeometry | null {
       return fretInlays()
     case 24: // Texas Soundhole Final
       return texasGeom(1, 'Final soundhole cut — 95mm')
+    case 7: // Longhorn Inside Texas
+      return artGeom(ART_7_LONGHORN, 'Steer skull inside the Texas outline')
+    case 8: // Bluebonnet Bouquet Inside Texas
+      return artGeom(ART_8_BOUQUET, 'Bluebonnet bouquet inside the Texas outline')
+    case 10: // Rope Border Texas
+      return artGeom(ART_10_ROPE, 'Texas outline with rope-twist border')
+    case 11: // Treble Clef + Texas
+      return artGeom(ART_11_TREBLE, 'Treble clef inside the Texas outline')
+    case 12: // Guitar Silhouette + Texas
+      return artGeom(ART_12_GUITAR, 'Guitar silhouette inside the Texas outline')
+    case 16: // Deep in the Heart Text + Texas
+      return artGeom(ART_16_TEXT, 'Deep in the Heart typography under Texas')
+    case 19: // Ornate Baroque Texas Map
+      return artGeom(ART_19_BAROQUE, 'Baroque frame with Texas map center')
+    case 20: // Mandala Texas
+      return artGeom(ART_20_MANDALA, 'Mandala clipped to the Texas silhouette')
+    case 22: // Western Filigree Guitar
+      return artGeom(ART_22_FILIGREE, 'Western filigree engulfing Texas')
+    case 23: // Bluebonnet Frame Texas
+      return artGeom(ART_23_WREATH, 'Bluebonnet wreath around Texas')
     default:
-      // 7 Longhorn, 8 Bluebonnet Bouquet, 10 Rope Border, 11 Treble Clef,
-      // 12 Guitar Silhouette, 16 Deep-in-the-Heart Text, 19 Baroque,
-      // 20 Mandala, 22 Filigree Guitar, 23 Bluebonnet Frame
       return null
   }
 }
 
 /** Template ids that have real vector geometry wired. */
-export const WIRED_TEMPLATE_IDS = [1, 2, 3, 4, 5, 6, 9, 13, 14, 15, 17, 18, 21, 24]
+export const WIRED_TEMPLATE_IDS = [
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+]
