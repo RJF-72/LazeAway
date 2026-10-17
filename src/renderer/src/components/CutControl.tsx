@@ -2,12 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLaser } from '../hooks/useLaser'
 import { Btn, Field, Panel, StatusPill } from './ui'
 import { PRESETS, DEFAULT_PRESET_BY_TAB, type MaterialPreset } from '@shared/presets'
-import { generateTexasGcode, generateFrameGcode } from '@shared/texasPath'
+import { generatePathsGcode, generateBoundsFrame } from '@shared/texasPath'
+import type { TemplateGeometry } from '@shared/templateGeometry'
+import type { TexasTemplate } from '@shared/texasTemplatesTypes'
+import type { Material } from '@shared/materialTypes'
 
-type Tab = 'CUT' | 'ENGRAVE' | 'MARK'
+export type Tab = 'CUT' | 'ENGRAVE' | 'MARK'
 
 export interface CutControlProps {
-  templateScale: number | null
+  template: TexasTemplate | null
+  geometry: TemplateGeometry | null
+  material: Material | null
+  tab: Tab
+  onTabChange: (t: Tab) => void
   onGcode: (lines: string[]) => void
 }
 
@@ -20,7 +27,14 @@ function fmtTime(ms: number): string {
   return `${h}:${m}:${s}`
 }
 
-export function CutControl({ templateScale, onGcode }: CutControlProps) {
+export function CutControl({
+  template,
+  geometry,
+  material,
+  tab,
+  onTabChange,
+  onGcode,
+}: CutControlProps) {
   const {
     connection,
     progress,
@@ -33,7 +47,6 @@ export function CutControl({ templateScale, onGcode }: CutControlProps) {
     pushLog,
   } = useLaser()
 
-  const [tab, setTab] = useState<Tab>('CUT')
   const [dpi, setDpi] = useState(300)
   const [power, setPower] = useState(100)
   const [speed, setSpeed] = useState(250)
@@ -72,9 +85,21 @@ export function CutControl({ templateScale, onGcode }: CutControlProps) {
   }
 
   const switchTab = (t: Tab) => {
-    setTab(t)
+    onTabChange(t)
     applyPreset(DEFAULT_PRESET_BY_TAB[t])
   }
+
+  // A material picked in the Material Library drives the cut settings.
+  useEffect(() => {
+    if (!material) return
+    setPower(material.power_percent)
+    setSpeed(material.speed_mm_min)
+    setPasses(material.passes)
+    setZStep(material.z_step_per_pass_mm)
+    setDpi(material.dpi)
+    onTabChange(material.operation)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [material])
 
   const presetsForTab = useMemo(
     () => PRESETS.filter((p: MaterialPreset) => p.category === tab.toLowerCase()),
@@ -82,38 +107,48 @@ export function CutControl({ templateScale, onGcode }: CutControlProps) {
   )
 
   const buildGcode = (): string[] | null => {
-    if (templateScale === null) return null
-    return generateTexasGcode(templateScale, {
-      speed,
-      powerPercent: power,
-      passes,
-      zStep,
-      travelHeight: 0,
-      optimize: true,
-      tol: 0.03,
-      originAtStart: true,
-    })
+    if (!geometry) return null
+    return generatePathsGcode(
+      geometry.paths,
+      geometry.closed,
+      {
+        speed,
+        powerPercent: power,
+        passes,
+        zStep,
+        travelHeight: 0,
+        optimize: true,
+        tol: 0.03,
+        originAtStart: true,
+      },
+      template?.name ?? 'template',
+    )
   }
 
   const doStart = async () => {
-    const lines = buildGcode()
-    if (!lines) {
-      pushLog('Load a Texas template on the bed canvas first.', 'error')
+    if (!template) {
+      pushLog('Select a template in the left panel first.', 'error')
       return
     }
+    if (!geometry) {
+      pushLog(`"${template.name}" has no vector artwork yet — nothing to cut.`, 'error')
+      return
+    }
+    const lines = buildGcode()
+    if (!lines) return
     onGcode(lines)
-    pushLog(`START: streaming ${lines.length} lines (${tab})`, 'info')
+    pushLog(`START: ${template.name} — streaming ${lines.length} lines (${tab})`, 'info')
     await startStream(lines)
   }
 
   const doFrame = async () => {
-    if (templateScale === null) {
-      pushLog('Load a Texas template on the bed canvas first.', 'error')
+    if (!template || !geometry) {
+      pushLog('Select a template with vector artwork first.', 'error')
       return
     }
-    const lines = generateFrameGcode(templateScale, 1000)
+    const lines = generateBoundsFrame(geometry.bounds, 1000)
     onGcode(lines)
-    pushLog('FRAME: tracing outline with laser off (S0)', 'info')
+    pushLog(`FRAME: ${template.name} bounds, laser off (S0)`, 'info')
     await startStream(lines)
   }
 
@@ -180,6 +215,24 @@ export function CutControl({ templateScale, onGcode }: CutControlProps) {
           ))}
         </div>
 
+        {/* Active material */}
+        {material && (
+          <div className="rounded-lg bg-[#161616] border border-[#3a3a3a] px-3 py-2 text-[11px]">
+            <span className="text-[#6b7280] uppercase tracking-wider font-semibold">
+              Material
+            </span>
+            <div className="text-[#f5f5f5] font-semibold mt-0.5">
+              {material.name}{' '}
+              <span className="text-[#6b7280] font-normal">
+                ({material.operation}) · {material.thickness_mm}mm
+              </span>
+            </div>
+            {material.coating_required && (
+              <div className="text-[#eab308] mt-0.5">⚠ {material.notes}</div>
+            )}
+          </div>
+        )}
+
         {/* Presets + DPI */}
         <div className="grid grid-cols-2 gap-2">
           <Field label="Material preset">
@@ -240,14 +293,14 @@ export function CutControl({ templateScale, onGcode }: CutControlProps) {
             variant="accent"
             size="lg"
             className="col-span-2 py-3 text-base"
-            disabled={!connected || jobActive || templateScale === null}
+            disabled={!connected || jobActive || !geometry}
             onClick={() => void doStart()}
           >
             ▶ START
           </Btn>
           <Btn
             variant="gantry"
-            disabled={!connected || jobActive || templateScale === null}
+            disabled={!connected || jobActive || !geometry}
             onClick={() => void doFrame()}
           >
             ⧉ FRAME
@@ -263,9 +316,15 @@ export function CutControl({ templateScale, onGcode }: CutControlProps) {
           </Btn>
         </div>
 
-        {templateScale === null && (
+        {!template && (
           <div className="text-[11px] text-[#eab308]">
-            Load a Texas template (bed canvas) to enable START / FRAME.
+            Select a template in the left panel to enable START / FRAME.
+          </div>
+        )}
+        {template && !geometry && (
+          <div className="text-[11px] text-[#eab308]">
+            “{template.name}” has no vector artwork yet — START is disabled until the
+            artwork is drawn.
           </div>
         )}
 
@@ -334,7 +393,7 @@ export function CutControl({ templateScale, onGcode }: CutControlProps) {
         <p className="text-[10px] text-[#6b7280] leading-relaxed">
           Anti-stutter: default {speed <= 250 ? '250' : speed}mm/min, acceleration
           $120/$121=300 on connect, 15-line GRBL buffer with ok-waiting, collinear
-          merge on the Texas outline.
+          merge on dense paths.
         </p>
       </div>
     </Panel>

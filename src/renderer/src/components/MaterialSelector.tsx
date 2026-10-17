@@ -6,11 +6,14 @@ import { Btn, Field } from './ui'
 export interface MaterialSelectorProps {
   onMaterialSelect: (material: Material | undefined) => void
   defaultMaterialId?: string
+  /** When set, only materials for this operation are listed. */
+  operationFilter?: 'CUT' | 'ENGRAVE' | 'MARK'
 }
 
 export function MaterialSelector({
   onMaterialSelect,
   defaultMaterialId = TEXAS_SPRUCE_DEFAULT,
+  operationFilter,
 }: MaterialSelectorProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -25,9 +28,10 @@ export function MaterialSelector({
       const matchesSearch =
         q === '' || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
       const matchesCategory = selectedCategory === 'All' || m.category === selectedCategory
-      return matchesSearch && matchesCategory
+      const matchesOp = !operationFilter || m.operation === operationFilter
+      return matchesSearch && matchesCategory && matchesOp
     })
-  }, [materials, searchTerm, selectedCategory])
+  }, [materials, searchTerm, selectedCategory, operationFilter])
 
   const selected = selectedId ? findMaterial(selectedId) : undefined
 
@@ -109,6 +113,8 @@ export function MaterialSelector({
             <span className="text-right font-semibold">{selected.kerf_mm} mm</span>
             <span className="text-[#9ca3af]">DPI</span>
             <span className="text-right font-semibold">{selected.dpi}</span>
+            <span className="text-[#9ca3af]">Photo tone</span>
+            <span className="text-right font-semibold capitalize">{selected.photo_tone}</span>
           </div>
 
           {selected.coating_required && (

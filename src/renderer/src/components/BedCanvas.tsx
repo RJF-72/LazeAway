@@ -1,36 +1,22 @@
 import { useMemo } from 'react'
 import { useLaser } from '../hooks/useLaser'
-import { texasPathData, texasBounds } from '@shared/texasPath'
+import type { TemplateGeometry } from '@shared/templateGeometry'
 import { Btn, Panel } from './ui'
 
 export interface BedCanvasProps {
-  templateScale: number | null
-  onLoadTemplate: (scale: number) => void
+  geometry: TemplateGeometry | null
+  templateName: string | null
   onClearTemplate: () => void
 }
 
 const BED_W = 150
 const BED_H = 200
 
-export function BedCanvas({
-  templateScale,
-  onLoadTemplate,
-  onClearTemplate,
-}: BedCanvasProps) {
+export function BedCanvas({ geometry, templateName, onClearTemplate }: BedCanvasProps) {
   const { status, trail, clearTrail } = useLaser()
 
-  const path = useMemo(
-    () => (templateScale ? texasPathData(templateScale) : null),
-    [templateScale],
-  )
-  const bounds = useMemo(
-    () => (templateScale ? texasBounds(templateScale) : null),
-    [templateScale],
-  )
-
   const mpos = status?.mpos ?? { x: 0, y: 0, z: 0 }
-  const inside =
-    Math.abs(mpos.x) <= BED_W / 2 && Math.abs(mpos.y) <= BED_H / 2
+  const inside = Math.abs(mpos.x) <= BED_W / 2 && Math.abs(mpos.y) <= BED_H / 2
 
   // Grid lines every 10mm
   const xLines: number[] = []
@@ -40,12 +26,43 @@ export function BedCanvas({
 
   const trailPts = trail.map((p) => `${p.x.toFixed(2)},${(-p.y).toFixed(2)}`).join(' ')
 
+  const bounds = geometry?.bounds ?? null
+  const fitsBed = useMemo(() => {
+    if (!bounds) return true
+    return (
+      bounds.minX >= -BED_W / 2 &&
+      bounds.maxX <= BED_W / 2 &&
+      bounds.minY >= -BED_H / 2 &&
+      bounds.maxY <= BED_H / 2
+    )
+  }, [bounds])
+
+  const pathEls = useMemo(() => {
+    if (!geometry) return null
+    return geometry.paths.map((pts, i) => {
+      const d =
+        pts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ') +
+        (geometry.closed[i] ? ' Z' : '')
+      return (
+        <path
+          key={i}
+          d={d}
+          fill={geometry.closed[i] ? 'rgba(239,68,68,0.06)' : 'none'}
+          stroke="#ef4444"
+          strokeWidth={1.1}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      )
+    })
+  }, [geometry])
+
   return (
     <Panel
       title="Bed — Center Origin (0,0)"
       right={
         <span className="text-[10px] text-[#6b7280] font-mono">
-          ViewBox -75 -100 150 200
+          {templateName ?? 'no template'} · ViewBox -75 -100 150 200
         </span>
       }
       bodyClassName="p-2"
@@ -97,18 +114,8 @@ export function BedCanvas({
               ORIGIN 0,0
             </text>
 
-            {/* Texas outline (machine coords, y-up -> flip) */}
-            {path && (
-              <g transform="scale(1,-1)">
-                <path
-                  d={path}
-                  fill="rgba(239,68,68,0.06)"
-                  stroke="#ef4444"
-                  strokeWidth={1.2}
-                  strokeLinejoin="round"
-                />
-              </g>
-            )}
+            {/* template geometry (machine coords, y-up -> flip) */}
+            {pathEls && <g transform="scale(1,-1)">{pathEls}</g>}
 
             {/* template bounding box */}
             {bounds && (
@@ -118,10 +125,10 @@ export function BedCanvas({
                 width={bounds.w}
                 height={bounds.h}
                 fill="none"
-                stroke="#ef4444"
-                strokeWidth={0.3}
+                stroke={fitsBed ? '#ef4444' : '#eab308'}
+                strokeWidth={0.4}
                 strokeDasharray="2 2"
-                opacity={0.6}
+                opacity={0.8}
               />
             )}
 
@@ -165,22 +172,8 @@ export function BedCanvas({
 
         {/* template controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <Btn
-            variant={templateScale === 1 ? 'accent' : 'default'}
-            size="sm"
-            onClick={() => onLoadTemplate(1)}
-          >
-            Load Texas 95mm
-          </Btn>
-          <Btn
-            variant={templateScale === 0.842 ? 'accent' : 'default'}
-            size="sm"
-            onClick={() => onLoadTemplate(0.842)}
-          >
-            Load Texas 80mm
-          </Btn>
-          <Btn variant="ghost" size="sm" onClick={onClearTemplate} disabled={!templateScale}>
-            Clear
+          <Btn variant="ghost" size="sm" onClick={onClearTemplate} disabled={!geometry}>
+            Clear Template
           </Btn>
           <Btn variant="ghost" size="sm" onClick={clearTrail} disabled={trail.length === 0}>
             Clear Trail
@@ -190,6 +183,16 @@ export function BedCanvas({
             {bounds && ` • ${bounds.w.toFixed(1)}×${bounds.h.toFixed(1)}mm`}
           </span>
         </div>
+
+        {geometry && !fitsBed && (
+          <div className="rounded border border-[#eab308] bg-[#eab308]/10 px-2 py-1.5 text-[11px] text-[#eab308]">
+            ⚠ Template ({bounds!.w.toFixed(0)}×{bounds!.h.toFixed(0)}mm) is bigger than the
+            150×200mm bed — reposition the stock or cut it in sections.
+          </div>
+        )}
+        {geometry?.note && (
+          <div className="text-[10px] text-[#6b7280]">{geometry.note}</div>
+        )}
       </div>
     </Panel>
   )

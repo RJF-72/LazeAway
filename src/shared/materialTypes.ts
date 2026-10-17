@@ -1,3 +1,5 @@
+import type { PhotoTone } from './photoTone'
+
 export interface Material {
   id: string
   name: string
@@ -16,5 +18,7 @@ export interface Material {
   notes: string
   color: string
   coating_required: boolean
+  /** Webcam snapshot exposure preset tuned for this stock. */
+  photo_tone: PhotoTone
 }
 export interface MaterialLibrary { materials: Material[] }

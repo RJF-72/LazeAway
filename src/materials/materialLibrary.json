@@ -17,7 +17,8 @@
       "air_assist": false,
       "notes": "Orange shield ON. Best accuracy for 6W diode.",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "basswood_3mm_cut",
@@ -36,7 +37,8 @@
       "air_assist": false,
       "notes": "Orange shield ON. Basswood is best for accuracy.",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "basswood_5mm_cut",
@@ -55,7 +57,8 @@
       "air_assist": false,
       "notes": "Slow + many passes",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "balsa_2mm_cut",
@@ -74,7 +77,8 @@
       "air_assist": false,
       "notes": "Very soft",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "balsa_3mm_cut",
@@ -93,7 +97,8 @@
       "air_assist": false,
       "notes": "Very soft",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "spruce_pine_3mm_cut_texas",
@@ -112,7 +117,8 @@
       "air_assist": false,
       "notes": "Texas guitar soundhole default - slower + many passes to avoid stuck bug. Anti-stutter safe.",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "plywood_basswood_3mm_cut",
@@ -131,7 +137,8 @@
       "air_assist": false,
       "notes": "Tends to delaminate",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "plywood_5mm_cut",
@@ -150,7 +157,8 @@
       "air_assist": false,
       "notes": "Not recommended - will char",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "mdf_3mm_cut",
@@ -169,7 +177,8 @@
       "air_assist": false,
       "notes": "Dusty, ventilate well",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "cherry_3mm_cut",
@@ -188,7 +197,8 @@
       "air_assist": false,
       "notes": "Good results",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "light"
     },
     {
       "id": "walnut_3mm_cut",
@@ -207,7 +217,8 @@
       "air_assist": false,
       "notes": "Dark wood - beautiful results",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "very light"
     },
     {
       "id": "bamboo_3mm_cut",
@@ -226,7 +237,8 @@
       "air_assist": false,
       "notes": "Dense, handle with care",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "oak_3mm_cut",
@@ -245,7 +257,8 @@
       "air_assist": false,
       "notes": "Hard - burns easily, go slow",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "basswood_engrave",
@@ -264,7 +277,8 @@
       "air_assist": "",
       "notes": "Most accurate for 6W diode",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "pine_engrave",
@@ -283,7 +297,8 @@
       "air_assist": "",
       "notes": "Grainy - increase power if needed",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "walnut_engrave",
@@ -302,7 +317,8 @@
       "air_assist": "",
       "notes": "Dark wood needs less power",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "very light"
     },
     {
       "id": "black_acrylic_2mm_cut",
@@ -321,7 +337,8 @@
       "air_assist": false,
       "notes": "Black absorbs well",
       "color": "black",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "very light"
     },
     {
       "id": "black_acrylic_3mm_cut",
@@ -340,7 +357,8 @@
       "air_assist": false,
       "notes": "Black absorbs well",
       "color": "black",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "very light"
     },
     {
       "id": "red_acrylic_2mm_cut",
@@ -359,7 +377,8 @@
       "air_assist": false,
       "notes": "Opaque colors can cut",
       "color": "red",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "light"
     },
     {
       "id": "blue_acrylic_2mm_cut",
@@ -378,7 +397,8 @@
       "air_assist": false,
       "notes": "Opaque colors can cut",
       "color": "blue",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "light"
     },
     {
       "id": "green_acrylic_2mm_cut",
@@ -397,7 +417,8 @@
       "air_assist": false,
       "notes": "Opaque colors can cut",
       "color": "green",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "light"
     },
     {
       "id": "clear_acrylic_engrave_coated",
@@ -416,7 +437,8 @@
       "air_assist": "",
       "notes": "6W diode CANNOT cut clear/white acrylic. Must use black spray paint/coating.",
       "color": "clear",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "medium"
     },
     {
       "id": "white_acrylic_engrave_coated",
@@ -435,7 +457,8 @@
       "air_assist": "",
       "notes": "6W diode CANNOT cut clear/white acrylic. Must use black spray paint/coating.",
       "color": "white",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "medium"
     },
     {
       "id": "black_acrylic_engrave",
@@ -454,7 +477,8 @@
       "air_assist": "",
       "notes": "Very accurate white mark",
       "color": "black",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "very light"
     },
     {
       "id": "leather_genuine_1_5mm_cut",
@@ -473,7 +497,8 @@
       "air_assist": false,
       "notes": "Ventilate!",
       "color": "brown",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "leather_faux_1_5mm_cut",
@@ -492,7 +517,8 @@
       "air_assist": false,
       "notes": "Toxic fumes - ventilate!",
       "color": "brown",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "leather_engrave",
@@ -511,7 +537,8 @@
       "air_assist": "",
       "notes": "Clean engrave",
       "color": "brown",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "cardboard_2mm_cut",
@@ -530,7 +557,8 @@
       "air_assist": false,
       "notes": "Fire risk - watch it!",
       "color": "brown",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "kraft_paper_cut",
@@ -549,7 +577,8 @@
       "air_assist": false,
       "notes": "Cut quickly",
       "color": "brown",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "cotton_fabric_cut",
@@ -568,7 +597,8 @@
       "air_assist": false,
       "notes": "May fray",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "denim_cut",
@@ -587,7 +617,8 @@
       "air_assist": false,
       "notes": "Thick fabric",
       "color": "blue",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "felt_2mm_cut",
@@ -606,7 +637,8 @@
       "air_assist": false,
       "notes": "Clean cut",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "felt_engrave",
@@ -625,7 +657,8 @@
       "air_assist": "",
       "notes": "Light engrave",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "anodized_aluminum_mark",
@@ -644,7 +677,8 @@
       "air_assist": "",
       "notes": "Removes anodize layer - very accurate. No deep cut.",
       "color": "silver",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "darker"
     },
     {
       "id": "painted_metal_mark",
@@ -663,7 +697,8 @@
       "air_assist": "",
       "notes": "Removes paint - no metal cut",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "darker"
     },
     {
       "id": "stainless_black_paint_mark",
@@ -682,7 +717,8 @@
       "air_assist": "",
       "notes": "6W diode cannot cut bare stainless without coating. This is marking only.",
       "color": "silver",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "darker"
     },
     {
       "id": "powder_coated_tumbler_mark",
@@ -701,7 +737,8 @@
       "air_assist": "",
       "notes": "Cylindrical marking - interval 0.08",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "darker"
     },
     {
       "id": "glass_black_paint_engrave",
@@ -720,7 +757,8 @@
       "air_assist": "",
       "notes": "Paint, engrave, wash off. No bare glass cutting on 6W diode.",
       "color": "clear",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "medium"
     },
     {
       "id": "white_tile_black_paint_engrave",
@@ -739,7 +777,8 @@
       "air_assist": "",
       "notes": "Norton White Tile method - extremely accurate. Coating required for bare tile.",
       "color": "white",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "medium"
     },
     {
       "id": "ceramic_tile_mark",
@@ -758,7 +797,8 @@
       "air_assist": "",
       "notes": "Same as white tile - coating required.",
       "color": "",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "medium"
     },
     {
       "id": "rubber_stamp_2mm_engrave",
@@ -777,7 +817,8 @@
       "air_assist": "",
       "notes": "Mirror image - reverse for stamps",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "light"
     },
     {
       "id": "abs_engrave",
@@ -796,7 +837,8 @@
       "air_assist": "",
       "notes": "DO NOT CUT ABS - toxic fumes. ENGRAVE ONLY with ventilation.",
       "color": "",
-      "coating_required": false
+      "coating_required": false,
+      "photo_tone": "medium"
     },
     {
       "id": "clear_acrylic_cut_forbidden",
@@ -815,7 +857,8 @@
       "air_assist": "",
       "notes": "6W diode CANNOT cut clear or white acrylic without coating. ENGRAVE ONLY with black spray paint.",
       "color": "clear",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "medium"
     },
     {
       "id": "white_acrylic_cut_forbidden",
@@ -834,7 +877,8 @@
       "air_assist": "",
       "notes": "6W diode CANNOT cut clear or white acrylic without coating. ENGRAVE ONLY with black spray paint.",
       "color": "white",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "medium"
     },
     {
       "id": "glass_bare_forbidden",
@@ -853,7 +897,8 @@
       "air_assist": "",
       "notes": "6W diode cannot cut bare glass/bare metal/stainless without coating. ENGRAVE ONLY with coating.",
       "color": "clear",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "medium"
     },
     {
       "id": "bare_metal_forbidden",
@@ -872,7 +917,8 @@
       "air_assist": "",
       "notes": "6W diode cannot cut bare metal/stainless without coating. Use marking with paint/coating only.",
       "color": "silver",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "darker"
     },
     {
       "id": "stainless_bare_forbidden",
@@ -891,7 +937,8 @@
       "air_assist": "",
       "notes": "6W diode cannot cut bare stainless without coating. Use marking with paint/coating only.",
       "color": "silver",
-      "coating_required": true
+      "coating_required": true,
+      "photo_tone": "darker"
     }
   ]
 }

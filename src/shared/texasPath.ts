@@ -199,35 +199,99 @@ export function generateTexasGcode(scale = 1, opts: GcodeOptions): string[] {
   return lines
 }
 
-/** Framing routine: travel the bounding box outline with the laser OFF (S0). */
-export function generateFrameGcode(scale = 1, speed = 1000): string[] {
-  const pts = texasPoints(scale)
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  for (const p of pts) {
-    if (p.x < minX) minX = p.x
-    if (p.x > maxX) maxX = p.x
-    if (p.y < minY) minY = p.y
-    if (p.y > maxY) maxY = p.y
+/**
+ * Convert arbitrary template geometry (multiple open/closed polylines) to
+ * GRBL G-code. Each path gets its own M5/G0 travel entry; closed paths loop
+ * back to their start point. Collinear merge is applied only to very dense
+ * paths (>250 pts) with a safeguard, so small exact shapes (circles, stars,
+ * fret dots) are never faceted.
+ */
+export function generatePathsGcode(
+  paths: Pt[][],
+  closed: boolean[],
+  opts: GcodeOptions,
+  label = 'template',
+): string[] {
+  const {
+    speed,
+    powerPercent,
+    passes,
+    zStep = 0,
+    travelHeight = 0,
+    tol = 0.03,
+    originAtStart = true,
+  } = opts
+
+  const s = Math.round((Math.max(0, Math.min(100, powerPercent)) / 100) * 1000)
+  const work = paths.map((p, i) => {
+    if (p.length > 250 && closed[i]) {
+      const merged = mergeCollinear(p, true, tol)
+      // Never let the merge destroy a shape: keep the original if it
+      // would drop more than 70% of the points.
+      if (merged.length >= Math.max(8, p.length * 0.3)) return merged
+    }
+    return p
+  })
+
+  const lines: string[] = []
+  lines.push(`; Artilume S1 - ${label}`)
+  lines.push('; Center origin: 0,0 = bed center. 150x200mm area.')
+  lines.push('G90 G21')
+  if (originAtStart) lines.push('G92 X0 Y0')
+  lines.push(`M4 S${s}`) // M4 = dynamic laser (ramps on/off) - safer than M3 for motion
+
+  for (let pass = 0; pass < passes; pass++) {
+    const z = travelHeight - zStep * pass
+    lines.push(`; pass ${pass + 1}/${passes}  Z=${z.toFixed(3)}`)
+    for (let pi = 0; pi < work.length; pi++) {
+      const pts = work[pi]
+      if (pts.length === 0) continue
+      const start = pts[0]
+      // travel to path start with the laser off
+      lines.push('M5')
+      lines.push(`G0 Z${z.toFixed(3)}`)
+      lines.push(`G0 X${start.x.toFixed(3)} Y${start.y.toFixed(3)}`)
+      lines.push(`M4 S${s}`)
+      lines.push(`G1 F${speed.toFixed(0)}`)
+      const seq = closed[pi] ? [...pts.slice(1), pts[0]] : pts.slice(1)
+      for (const p of seq) {
+        lines.push(`G1 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}`)
+      }
+    }
   }
+
+  lines.push('M5')
+  lines.push(`G0 Z${travelHeight.toFixed(3)}`)
+  lines.push('G0 X0 Y0')
+  lines.push('; done')
+  return lines
+}
+
+/** Framing routine for an arbitrary bounding box, laser OFF. */
+export function generateBoundsFrame(
+  b: { minX: number; minY: number; maxX: number; maxY: number },
+  speed = 1000,
+): string[] {
   return [
     '; FRAME - laser off trace of bounding box',
     'G90 G21',
     'G92 X0 Y0',
     'M5',
     `G1 F${speed.toFixed(0)}`,
-    `G0 X${minX.toFixed(3)} Y${minY.toFixed(3)}`,
-    `G1 X${maxX.toFixed(3)} Y${minY.toFixed(3)}`,
-    `G1 X${maxX.toFixed(3)} Y${maxY.toFixed(3)}`,
-    `G1 X${minX.toFixed(3)} Y${maxY.toFixed(3)}`,
-    `G1 X${minX.toFixed(3)} Y${minY.toFixed(3)}`,
+    `G0 X${b.minX.toFixed(3)} Y${b.minY.toFixed(3)}`,
+    `G1 X${b.maxX.toFixed(3)} Y${b.minY.toFixed(3)}`,
+    `G1 X${b.maxX.toFixed(3)} Y${b.maxY.toFixed(3)}`,
+    `G1 X${b.minX.toFixed(3)} Y${b.maxY.toFixed(3)}`,
+    `G1 X${b.minX.toFixed(3)} Y${b.minY.toFixed(3)}`,
     'M5',
     'G0 X0 Y0',
   ]
 }
 
+/** Framing routine: travel the bounding box outline with the laser OFF (S0). */
+export function generateFrameGcode(scale = 1, speed = 1000): string[] {
+  return generateBoundsFrame(texasBounds(scale), speed)
+}
 /** Bounding box of the Texas outline at a given scale. */
 export function texasBounds(scale = 1): { minX: number; minY: number; maxX: number; maxY: number; w: number; h: number } {
   const pts = texasPoints(scale)

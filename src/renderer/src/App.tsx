@@ -1,13 +1,20 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { LaserProvider, useLaser } from './hooks/useLaser'
 import { ConnectionPanel } from './components/ConnectionPanel'
 import { BedCanvas } from './components/BedCanvas'
 import { HeightIndicator } from './components/HeightIndicator'
 import { WebcamMonitor } from './components/WebcamMonitor'
-import { CutControl } from './components/CutControl'
+import { CutControl, type Tab } from './components/CutControl'
 import { ConsolePanel } from './components/ConsolePanel'
 import { GCodePanel } from './components/GCodePanel'
-import { Btn, StatusPill } from './components/ui'
+import { TemplateSelector } from './components/TemplateSelector'
+import { MaterialSelector } from './components/MaterialSelector'
+import { Btn, Panel, StatusPill } from './components/ui'
+import { geometryForTemplate } from '@shared/templateGeometry'
+import { findMaterial, TEXAS_SPRUCE_DEFAULT } from '@shared/materialUtils'
+import type { PhotoTone } from '@shared/photoTone'
+import type { TexasTemplate } from '@shared/texasTemplatesTypes'
+import type { Material } from '@shared/materialTypes'
 
 export default function App() {
   return (
@@ -20,20 +27,42 @@ export default function App() {
 function Shell() {
   const { connection, status, pushLog, send, sendRealtime, stopStream, jobActive } =
     useLaser()
-  const [templateScale, setTemplateScale] = useState<number | null>(null)
+  const [template, setTemplate] = useState<TexasTemplate | null>(null)
+  const [material, setMaterial] = useState<Material | null>(
+    () => findMaterial(TEXAS_SPRUCE_DEFAULT) ?? null,
+  )
+  const [photoTone, setPhotoTone] = useState<PhotoTone>('medium')
+  const [tab, setTab] = useState<Tab>('CUT')
   const [gcode, setGcode] = useState<string[]>([])
 
-  const onLoadTemplate = useCallback(
-    (scale: number) => {
-      setTemplateScale(scale)
-      const size = scale === 1 ? '95mm' : scale === 0.842 ? '80mm' : `${scale}`
-      pushLog(`Loaded Texas soundhole template (${size})`, 'info')
+  const geometry = useMemo(
+    () => (template ? geometryForTemplate(template.id) : null),
+    [template],
+  )
+
+  const onSelectTemplate = useCallback(
+    (t: TexasTemplate | undefined) => {
+      const next = t ?? null
+      setTemplate(next)
+      if (!next) return
+      const g = geometryForTemplate(next.id)
+      if (g) {
+        pushLog(
+          `Template: ${next.name} — ${g.paths.length} path(s), ` +
+            `${g.bounds.w.toFixed(1)}×${g.bounds.h.toFixed(1)}mm`,
+          'info',
+        )
+      } else {
+        pushLog(`Template: ${next.name} — vector artwork pending`, 'error')
+      }
+      // Suggest the matching operation tab for the template type.
+      setTab(next.type === 'engrave' || next.type === 'ornate' ? 'ENGRAVE' : 'CUT')
     },
     [pushLog],
   )
 
   const onClearTemplate = useCallback(() => {
-    setTemplateScale(null)
+    setTemplate(null)
     setGcode([])
   }, [])
 
@@ -106,6 +135,51 @@ function Shell() {
           {/* Left column */}
           <div className="overflow-y-auto pr-1 flex flex-col gap-3 min-h-0">
             <ConnectionPanel />
+
+            <Panel title="Template">
+              <div className="flex flex-col gap-2">
+                <TemplateSelector defaultId={template?.id} onSelect={onSelectTemplate} />
+                {template && (
+                  <div className="text-[11px] leading-relaxed">
+                    <div className="font-semibold text-[#f5f5f5]">{template.name}</div>
+                    <div className="text-[#9ca3af]">
+                      {template.subtitle} · {template.complexity}
+                    </div>
+                    <div className="text-[#6b7280]">
+                      {template.material} — {template.detail}
+                    </div>
+                    {geometry ? (
+                      <div className="text-[#6b7280] mt-1">
+                        {geometry.paths.length} path(s) ·{' '}
+                        {geometry.bounds.w.toFixed(1)}×{geometry.bounds.h.toFixed(1)}mm
+                      </div>
+                    ) : (
+                      <div className="text-[#eab308] mt-1">
+                        Vector artwork pending — pick another template to cut.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel
+              title="Material Library"
+              right={
+                <span className="text-[10px] text-[#6b7280] font-mono">
+                  {tab} only
+                </span>
+              }
+            >
+              <MaterialSelector
+                operationFilter={tab}
+                onMaterialSelect={(m) => {
+                  setMaterial(m ?? null)
+                  if (m) setPhotoTone(m.photo_tone)
+                }}
+              />
+            </Panel>
+
             <div className="panel p-3 text-[10px] text-[#6b7280] leading-relaxed">
               <p className="font-semibold text-[#9ca3af] mb-1">Hardware notes</p>
               <ul className="list-disc pl-4 space-y-0.5">
@@ -120,8 +194,8 @@ function Shell() {
           {/* Center column */}
           <div className="overflow-y-auto pr-1 flex flex-col gap-3 min-h-0">
             <BedCanvas
-              templateScale={templateScale}
-              onLoadTemplate={onLoadTemplate}
+              geometry={geometry}
+              templateName={template?.name ?? null}
               onClearTemplate={onClearTemplate}
             />
             <GCodePanel lines={gcode} />
@@ -130,9 +204,16 @@ function Shell() {
 
           {/* Right column */}
           <div className="overflow-y-auto pr-1 flex flex-col gap-3 min-h-0">
-            <CutControl templateScale={templateScale} onGcode={setGcode} />
+            <CutControl
+              template={template}
+              geometry={geometry}
+              material={material}
+              tab={tab}
+              onTabChange={setTab}
+              onGcode={setGcode}
+            />
             <HeightIndicator />
-            <WebcamMonitor />
+            <WebcamMonitor tone={photoTone} />
           </div>
         </div>
       </main>
