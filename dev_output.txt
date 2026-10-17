@@ -1,0 +1,2 @@
+npm notice run artilume-s1-desktop-controller@1.0.0 dev
+npm notice run npm run build:electron && concurrently -k -n VITE,ELECTRON -c cyan,magenta "npm:dev:vite" "npm:dev:electron"
