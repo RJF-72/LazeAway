@@ -45,6 +45,25 @@ export interface SerialLogEntry {
   t: number
 }
 
+/** One entry in the user's saved artwork library. */
+export interface ArtworkEntry {
+  id: string
+  /** Display name (file name at import time). */
+  name: string
+  kind: 'vector' | 'image'
+  createdAt: number
+}
+
+/** Raw file payload exchanged with the artwork store. */
+export interface ArtworkFile {
+  name: string
+  kind: 'vector' | 'image'
+  /** Original file extension without the dot, e.g. "svg", "png". */
+  ext: string
+  /** File bytes, base64 (no data-URL prefix). */
+  bytesBase64: string
+}
+
 // IPC surface exposed on window.laser by the preload script.
 export interface LaserApi {
   listPorts(): Promise<PortInfo[]>
@@ -64,6 +83,12 @@ export interface LaserApi {
   streamPause(): Promise<void>
   streamResume(): Promise<void>
   streamStop(): Promise<void>
+
+  // Saved artwork library (userData/artwork)
+  artworkList(): Promise<ArtworkEntry[]>
+  artworkSave(file: ArtworkFile): Promise<ArtworkEntry>
+  artworkLoad(id: string): Promise<ArtworkFile | null>
+  artworkDelete(id: string): Promise<void>
 
   // Event subscriptions (return unsubscribe fn)
   onLine(cb: (entry: SerialLogEntry) => void): () => void

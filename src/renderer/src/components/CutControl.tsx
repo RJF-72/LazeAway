@@ -3,19 +3,32 @@ import { useLaser } from '../hooks/useLaser'
 import { Btn, Field, Panel, StatusPill } from './ui'
 import { PRESETS, DEFAULT_PRESET_BY_TAB, type MaterialPreset } from '@shared/presets'
 import { generatePathsGcode, generateBoundsFrame } from '@shared/texasPath'
+import { rasterGcode, estimateRasterLines } from '@shared/rasterEngrave'
 import type { TemplateGeometry } from '@shared/templateGeometry'
 import type { TexasTemplate } from '@shared/texasTemplatesTypes'
 import type { Material } from '@shared/materialTypes'
+import type { LoadedArtwork } from '../lib/artwork'
 
 export type Tab = 'CUT' | 'ENGRAVE' | 'MARK'
 
 export interface CutControlProps {
   template: TexasTemplate | null
+  artwork: LoadedArtwork | null
   geometry: TemplateGeometry | null
   material: Material | null
   tab: Tab
   onTabChange: (t: Tab) => void
   onGcode: (lines: string[]) => void
+  /** Active job width in mm (height follows aspect). */
+  widthMm: number
+  onWidthMm: (w: number) => void
+  /** Natural job width for the ↺ reset (null when nothing loaded). */
+  naturalWidthMm: number | null
+  /** Raster tone 0 lightest .. 100 darkest. */
+  darkness: number
+  onDarkness: (v: number) => void
+  invert: boolean
+  onInvert: (v: boolean) => void
 }
 
 function fmtTime(ms: number): string {
@@ -29,11 +42,19 @@ function fmtTime(ms: number): string {
 
 export function CutControl({
   template,
+  artwork,
   geometry,
   material,
   tab,
   onTabChange,
   onGcode,
+  widthMm,
+  onWidthMm,
+  naturalWidthMm,
+  darkness,
+  onDarkness,
+  invert,
+  onInvert,
 }: CutControlProps) {
   const {
     connection,
@@ -90,24 +111,63 @@ export function CutControl({
   }
 
   // A material picked in the Material Library drives the cut settings.
+  const artworkIsImage = artwork?.kind === 'image'
   useEffect(() => {
     if (!material) return
     setPower(material.power_percent)
     setSpeed(material.speed_mm_min)
-    setPasses(material.passes)
+    setPasses(artworkIsImage ? 1 : material.passes)
     setZStep(material.z_step_per_pass_mm)
     setDpi(material.dpi)
     onTabChange(material.operation)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [material])
 
+  // Picture engraving burns once — counteract multi-pass cut presets.
+  const imageKey = artwork?.kind === 'image' ? artwork.name : null
+  useEffect(() => {
+    if (imageKey) setPasses(1)
+  }, [imageKey])
+
   const presetsForTab = useMemo(
     () => PRESETS.filter((p: MaterialPreset) => p.category === tab.toLowerCase()),
     [tab],
   )
 
+  const isImage = artwork?.kind === 'image'
+  const jobName = artwork?.name ?? template?.name ?? null
+  const heightMm = isImage && artwork ? widthMm * (artwork.hPx / artwork.wPx) : geometry?.bounds.h ?? 0
+  const fitsBed =
+    !!geometry &&
+    geometry.bounds.minX >= -75 &&
+    geometry.bounds.maxX <= 75 &&
+    geometry.bounds.minY >= -100 &&
+    geometry.bounds.maxY <= 100
+
+  // Line-count preflight for picture jobs so nobody queues a surprise
+  // 400k-line burn without seeing it first.
+  const rasterEstimate = useMemo(() => {
+    if (!isImage || !artwork || artwork.kind !== 'image') return null
+    return estimateRasterLines(artwork.gray, artwork.wPx, artwork.hPx, widthMm, dpi, darkness, invert, power)
+  }, [isImage, artwork, widthMm, dpi, darkness, invert, power])
+
   const buildGcode = (): string[] | null => {
-    if (!geometry) return null
+    if (isImage && artwork?.kind === 'image') {
+      const res = rasterGcode(artwork.gray, artwork.wPx, artwork.hPx, {
+        widthMm,
+        dpi,
+        speed,
+        powerPercent: power,
+        passes,
+        zStep,
+        travelHeight: 0,
+        darkness,
+        invert,
+        originAtStart: true,
+      })
+      return res.lines
+    }
+    if (!geometry || geometry.paths.length === 0) return null
     return generatePathsGcode(
       geometry.paths,
       geometry.closed,
@@ -121,34 +181,40 @@ export function CutControl({
         tol: 0.03,
         originAtStart: true,
       },
-      template?.name ?? 'template',
+      jobName ?? 'template',
     )
   }
 
   const doStart = async () => {
-    if (!template) {
-      pushLog('Select a template in the left panel first.', 'error')
+    if (!jobName) {
+      pushLog('Select a template or import your own artwork first.', 'error')
       return
     }
-    if (!geometry) {
-      pushLog(`"${template.name}" has no vector artwork yet — nothing to cut.`, 'error')
+    if (isImage && (!artwork || artwork.kind !== 'image')) return
+    if (!isImage && (!geometry || geometry.paths.length === 0)) {
+      pushLog(`"${jobName}" has no vector artwork yet — nothing to cut.`, 'error')
       return
     }
     const lines = buildGcode()
     if (!lines) return
     onGcode(lines)
-    pushLog(`START: ${template.name} — streaming ${lines.length} lines (${tab})`, 'info')
+    pushLog(
+      `START: ${jobName} — streaming ${lines.length} lines (${tab}` +
+        (isImage ? `, ${rasterEstimate?.scanlines ?? '?'} scanlines, darkness ${darkness}` : '') +
+        ')',
+      'info',
+    )
     await startStream(lines)
   }
 
   const doFrame = async () => {
-    if (!template || !geometry) {
-      pushLog('Select a template with vector artwork first.', 'error')
+    if (!geometry) {
+      pushLog('Load a template or artwork first.', 'error')
       return
     }
     const lines = generateBoundsFrame(geometry.bounds, 1000)
     onGcode(lines)
-    pushLog(`FRAME: ${template.name} bounds, laser off (S0)`, 'info')
+    pushLog(`FRAME: ${jobName ?? 'bounds'} — laser off`, 'info')
     await startStream(lines)
   }
 
@@ -229,6 +295,102 @@ export function CutControl({
             </div>
             {material.coating_required && (
               <div className="text-[#eab308] mt-0.5">⚠ {material.notes}</div>
+            )}
+          </div>
+        )}
+
+        {/* Sizing — width drives height (aspect locked) for every job type */}
+        {geometry && (
+          <div className="rounded-lg bg-[#161616] border border-[#3a3a3a] px-3 py-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="panel-title">Size</span>
+              <span className={`text-[10px] font-mono ${fitsBed ? 'text-[#6b7280]' : 'text-[#eab308]'}`}>
+                {fitsBed ? 'fits bed' : 'EXCEEDS BED'}
+              </span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
+              <Field label="Width" hint="height follows aspect">
+                <div className="flex items-center gap-1">
+                  <input
+                    className="field w-full"
+                    type="number"
+                    min={1}
+                    max={300}
+                    step={0.5}
+                    value={widthMm}
+                    onChange={(e) => onWidthMm(Math.min(300, Math.max(1, Number(e.target.value) || 1)))}
+                  />
+                  <span className="text-[11px] text-[#6b7280] font-mono">mm</span>
+                </div>
+              </Field>
+              <div className="text-right pb-0.5">
+                <div className="text-[9px] text-[#6b7280] uppercase">Height</div>
+                <div className="text-sm text-[#f5f5f5] font-mono tabular">
+                  {heightMm.toFixed(1)} mm
+                </div>
+              </div>
+              <Btn
+                size="sm"
+                variant="ghost"
+                disabled={naturalWidthMm == null || Math.abs(widthMm - naturalWidthMm) < 0.05}
+                onClick={() => naturalWidthMm != null && onWidthMm(naturalWidthMm)}
+                title="Reset to natural size"
+              >
+                ↺
+              </Btn>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={Math.max(150, naturalWidthMm ?? 0, widthMm)}
+              step={1}
+              value={widthMm}
+              onChange={(e) => onWidthMm(Number(e.target.value))}
+              className="w-full"
+              title="Drag to resize the job"
+            />
+          </div>
+        )}
+
+        {/* Picture tone — light ↔ dark burn mapping */}
+        {isImage && (
+          <div className="rounded-lg bg-[#161616] border border-[#3a3a3a] px-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="panel-title">Engraving darkness</span>
+              <span className="text-xs font-mono text-[#f5f5f5]">{darkness}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={darkness}
+              onChange={(e) => onDarkness(Number(e.target.value))}
+              className="w-full"
+            />
+            <div className="flex items-center justify-between text-[10px] text-[#6b7280]">
+              <span>Light</span>
+              <span>Dark</span>
+            </div>
+            <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={invert}
+                onChange={(e) => onInvert(e.target.checked)}
+                className="accent-[#ff6b35] w-4 h-4"
+              />
+              <span className="text-[11px] text-[#9ca3af]">
+                Invert (burn light areas instead)
+              </span>
+            </label>
+            {rasterEstimate && (
+              <div className="text-[10px] text-[#6b7280] mt-2 font-mono tabular">
+                ≈ {rasterEstimate.scanlines} scanlines · {rasterEstimate.lines.toLocaleString()} G-code
+                lines @ {dpi}dpi
+                {rasterEstimate.lines > 150000 && (
+                  <span className="text-[#eab308]"> • large job — consider a smaller size or DPI</span>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -316,15 +478,22 @@ export function CutControl({
           </Btn>
         </div>
 
-        {!template && (
+        {!jobName && (
           <div className="text-[11px] text-[#eab308]">
-            Select a template in the left panel to enable START / FRAME.
+            Select a template or import your own artwork (SVG / picture) to enable START /
+            FRAME.
           </div>
         )}
-        {template && !geometry && (
+        {jobName && !geometry && (
           <div className="text-[11px] text-[#eab308]">
-            “{template.name}” has no vector artwork yet — START is disabled until the
-            artwork is drawn.
+            “{jobName}” has no vector artwork yet — START is disabled until the artwork is
+            drawn.
+          </div>
+        )}
+        {geometry && !fitsBed && (
+          <div className="text-[11px] text-[#eab308]">
+            Job ({geometry.bounds.w.toFixed(0)}×{geometry.bounds.h.toFixed(0)}mm) exceeds the
+            150×200mm bed — reduce the size or reposition the stock.
           </div>
         )}
 

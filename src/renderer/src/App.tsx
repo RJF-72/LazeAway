@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { LaserProvider, useLaser } from './hooks/useLaser'
 import { ConnectionPanel } from './components/ConnectionPanel'
-import { BedCanvas } from './components/BedCanvas'
+import { BedCanvas, type ImagePreview } from './components/BedCanvas'
 import { HeightIndicator } from './components/HeightIndicator'
 import { WebcamMonitor } from './components/WebcamMonitor'
 import { CutControl, type Tab } from './components/CutControl'
@@ -9,12 +9,24 @@ import { ConsolePanel } from './components/ConsolePanel'
 import { GCodePanel } from './components/GCodePanel'
 import { TemplateSelector } from './components/TemplateSelector'
 import { MaterialSelector } from './components/MaterialSelector'
+import { ArtworkPanel } from './components/ArtworkPanel'
 import { Btn, Panel, StatusPill } from './components/ui'
-import { geometryForTemplate } from '@shared/templateGeometry'
+import { geometryForTemplate, scaleGeometry, type TemplateGeometry } from '@shared/templateGeometry'
 import { findMaterial, TEXAS_SPRUCE_DEFAULT } from '@shared/materialUtils'
 import type { PhotoTone } from '@shared/photoTone'
 import type { TexasTemplate } from '@shared/texasTemplatesTypes'
 import type { Material } from '@shared/materialTypes'
+import type { LoadedArtwork } from './lib/artwork'
+
+const BED_W = 150
+const BED_H = 200
+
+/** Fit a natural size inside the bed (never scale up, only down). */
+function fitBed(w: number, h: number): { w: number; h: number } {
+  if (w <= 0 || h <= 0) return { w: 1, h: 1 }
+  const k = Math.min(1, BED_W / w, BED_H / h)
+  return { w: w * k, h: h * k }
+}
 
 export default function App() {
   return (
@@ -28,21 +40,80 @@ function Shell() {
   const { connection, status, pushLog, send, sendRealtime, stopStream, jobActive } =
     useLaser()
   const [template, setTemplate] = useState<TexasTemplate | null>(null)
+  const [artwork, setArtwork] = useState<LoadedArtwork | null>(null)
   const [material, setMaterial] = useState<Material | null>(
     () => findMaterial(TEXAS_SPRUCE_DEFAULT) ?? null,
   )
   const [photoTone, setPhotoTone] = useState<PhotoTone>('medium')
   const [tab, setTab] = useState<Tab>('CUT')
   const [gcode, setGcode] = useState<string[]>([])
+  // Job width in mm; height follows the artwork aspect (aspect always locked).
+  const [widthMm, setWidthMm] = useState(1)
+  // Raster tone: 0 lightest .. 100 darkest, plus ink-direction flip.
+  const [darkness, setDarkness] = useState(50)
+  const [invert, setInvert] = useState(false)
 
-  const geometry = useMemo(
-    () => (template ? geometryForTemplate(template.id) : null),
-    [template],
-  )
+  // Natural geometry before user sizing (vector jobs only).
+  const naturalGeom = useMemo(() => {
+    if (artwork?.kind === 'vector') return artwork.geometry
+    if (artwork) return null // image — bounds derive from width + aspect
+    return template ? geometryForTemplate(template.id) : null
+  }, [artwork, template])
+
+  // Natural job size: imports are fitted to the bed; built-ins keep their
+  // authored size (oversize built-ins still show the existing bed warning).
+  const naturalSize = useMemo(() => {
+    if (artwork?.kind === 'image') {
+      // 96dpi reference size, never larger than the bed.
+      const w = (artwork.wPx * 25.4) / 96
+      const h = (artwork.hPx * 25.4) / 96
+      return fitBed(w, h)
+    }
+    if (artwork?.kind === 'vector') {
+      return fitBed(artwork.geometry.bounds.w, artwork.geometry.bounds.h)
+    }
+    if (naturalGeom) return { w: naturalGeom.bounds.w, h: naturalGeom.bounds.h }
+    return null
+  }, [artwork, naturalGeom])
+
+  // Reset the size control whenever a different job is loaded.
+  useEffect(() => {
+    if (naturalSize) setWidthMm(Math.max(1, Math.round(naturalSize.w * 10) / 10))
+  }, [naturalSize])
+
+  // Active geometry (scaled to the chosen width), passed to bed + cut control.
+  const geometry = useMemo<TemplateGeometry | null>(() => {
+    if (artwork?.kind === 'image') {
+      const h = widthMm * (artwork.hPx / artwork.wPx)
+      return {
+        paths: [],
+        closed: [],
+        bounds: {
+          minX: -widthMm / 2,
+          minY: -h / 2,
+          maxX: widthMm / 2,
+          maxY: h / 2,
+          w: widthMm,
+          h,
+        },
+        note: `Picture · ${artwork.wPx}×${artwork.hPx}px @ ${widthMm.toFixed(1)}mm wide`,
+      }
+    }
+    if (naturalGeom) return scaleGeometry(naturalGeom, widthMm)
+    return null
+  }, [artwork, naturalGeom, widthMm])
+
+  const jobName = artwork?.name ?? template?.name ?? null
+
+  const imagePreview = useMemo<ImagePreview | null>(() => {
+    if (artwork?.kind !== 'image' || !geometry) return null
+    return { dataUrl: artwork.dataUrl, bounds: geometry.bounds, darkness, invert }
+  }, [artwork, geometry, darkness, invert])
 
   const onSelectTemplate = useCallback(
     (t: TexasTemplate | undefined) => {
       const next = t ?? null
+      if (next) setArtwork(null) // one active job at a time
       setTemplate(next)
       if (!next) return
       const g = geometryForTemplate(next.id)
@@ -61,8 +132,20 @@ function Shell() {
     [pushLog],
   )
 
+  const onArtwork = useCallback(
+    (a: LoadedArtwork | null) => {
+      if (a) {
+        setTemplate(null) // one active job at a time
+        setTab('ENGRAVE')
+      }
+      setArtwork(a)
+    },
+    [],
+  )
+
   const onClearTemplate = useCallback(() => {
     setTemplate(null)
+    setArtwork(null)
     setGcode([])
   }, [])
 
@@ -163,6 +246,8 @@ function Shell() {
               </div>
             </Panel>
 
+            <ArtworkPanel active={artwork} onArtwork={onArtwork} />
+
             <Panel
               title="Material Library"
               right={
@@ -195,7 +280,8 @@ function Shell() {
           <div className="overflow-y-auto pr-1 flex flex-col gap-3 min-h-0">
             <BedCanvas
               geometry={geometry}
-              templateName={template?.name ?? null}
+              templateName={jobName}
+              imagePreview={imagePreview}
               onClearTemplate={onClearTemplate}
             />
             <GCodePanel lines={gcode} />
@@ -206,11 +292,19 @@ function Shell() {
           <div className="overflow-y-auto pr-1 flex flex-col gap-3 min-h-0">
             <CutControl
               template={template}
+              artwork={artwork}
               geometry={geometry}
               material={material}
               tab={tab}
               onTabChange={setTab}
               onGcode={setGcode}
+              widthMm={widthMm}
+              onWidthMm={setWidthMm}
+              naturalWidthMm={naturalSize?.w ?? null}
+              darkness={darkness}
+              onDarkness={setDarkness}
+              invert={invert}
+              onInvert={setInvert}
             />
             <HeightIndicator />
             <WebcamMonitor tone={photoTone} />

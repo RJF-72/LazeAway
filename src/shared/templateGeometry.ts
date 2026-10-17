@@ -192,6 +192,24 @@ function make(paths: Pt[][], closed: boolean[], note?: string): TemplateGeometry
   return { paths, closed, bounds: pathsBounds(paths), note }
 }
 
+/**
+ * Uniformly scale geometry about the bed origin so its bounding box width
+ * becomes targetWidthMm (aspect ratio preserved). Geometry is authored
+ * centered at (0,0), so scaling about the origin keeps it centered; for
+ * imported artwork that isn't perfectly centered, the scaled result is
+ * re-centered on the bounds midpoint to keep the job on the bed.
+ */
+export function scaleGeometry(g: TemplateGeometry, targetWidthMm: number): TemplateGeometry {
+  if (!Number.isFinite(targetWidthMm) || targetWidthMm <= 0) return g
+  const k = g.bounds.w > 0.001 ? targetWidthMm / g.bounds.w : 1
+  if (Math.abs(k - 1) < 1e-9) return g
+  // Scale about the bounds center, then re-center so the job sits on (0,0).
+  const cx = (g.bounds.minX + g.bounds.maxX) / 2
+  const cy = (g.bounds.minY + g.bounds.maxY) / 2
+  const paths = g.paths.map((path) => path.map((p) => ({ x: (p.x - cx) * k, y: (p.y - cy) * k })))
+  return { paths, closed: [...g.closed], bounds: pathsBounds(paths), note: g.note }
+}
+
 // ---------- template geometries ----------
 
 function texasGeom(scale: number, note?: string): TemplateGeometry {

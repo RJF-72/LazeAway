@@ -3,16 +3,31 @@ import { useLaser } from '../hooks/useLaser'
 import type { TemplateGeometry } from '@shared/templateGeometry'
 import { Btn, Panel } from './ui'
 
+/** Picture preview overlay for imported raster artwork. */
+export interface ImagePreview {
+  dataUrl: string
+  bounds: TemplateGeometry['bounds']
+  /** Tone preview only — matches the raster darkness setting 0..100. */
+  darkness: number
+  invert: boolean
+}
+
 export interface BedCanvasProps {
   geometry: TemplateGeometry | null
   templateName: string | null
+  imagePreview?: ImagePreview | null
   onClearTemplate: () => void
 }
 
 const BED_W = 150
 const BED_H = 200
 
-export function BedCanvas({ geometry, templateName, onClearTemplate }: BedCanvasProps) {
+export function BedCanvas({
+  geometry,
+  templateName,
+  imagePreview,
+  onClearTemplate,
+}: BedCanvasProps) {
   const { status, trail, clearTrail } = useLaser()
 
   const mpos = status?.mpos ?? { x: 0, y: 0, z: 0 }
@@ -56,6 +71,27 @@ export function BedCanvas({ geometry, templateName, onClearTemplate }: BedCanvas
       )
     })
   }, [geometry])
+
+  // Picture preview: tone filter approximates the chosen darkness so the
+  // operator sees light/dark before burning. Light→bright, dark→dim.
+  const imageEl = useMemo(() => {
+    if (!imagePreview) return null
+    const { bounds, dataUrl, darkness, invert } = imagePreview
+    const brightness = (1.55 - (darkness / 100) * 1.1).toFixed(2)
+    const filter = `brightness(${brightness}) contrast(1.05)${invert ? ' invert(1)' : ''}`
+    return (
+      <image
+        href={dataUrl}
+        x={bounds.minX}
+        y={-bounds.maxY}
+        width={bounds.w}
+        height={bounds.h}
+        preserveAspectRatio="none"
+        style={{ filter }}
+        opacity={0.92}
+      />
+    )
+  }, [imagePreview])
 
   return (
     <Panel
@@ -113,6 +149,9 @@ export function BedCanvas({ geometry, templateName, onClearTemplate }: BedCanvas
             <text x={2.5} y={-2.5} fill="#ff6b35" fontSize={4} fontWeight={700}>
               ORIGIN 0,0
             </text>
+
+            {/* imported picture preview (SVG coords already y-flip-safe) */}
+            {imageEl}
 
             {/* template geometry (machine coords, y-up -> flip) */}
             {pathEls && <g transform="scale(1,-1)">{pathEls}</g>}

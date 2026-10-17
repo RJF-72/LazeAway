@@ -33,6 +33,11 @@ const api: LaserApi = {
   streamResume: () => ipcRenderer.invoke('stream:resume'),
   streamStop: () => ipcRenderer.invoke('stream:stop'),
 
+  artworkList: () => ipcRenderer.invoke('artwork:list'),
+  artworkSave: (file) => ipcRenderer.invoke('artwork:save', file),
+  artworkLoad: (id) => ipcRenderer.invoke('artwork:load', id),
+  artworkDelete: (id) => ipcRenderer.invoke('artwork:delete', id),
+
   onLine: subscribe<SerialLogEntry>('evt:line'),
   onStatus: subscribe<GrblStatus | null>('evt:status'),
   onState: subscribe<ConnectionState>('evt:state'),

@@ -3,6 +3,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { SerialManager, BAUD_RATE } from './serial'
+import { registerArtworkIpc } from './artworkStore'
 
 // Auto-updater intentionally disabled (offline-only app).
 const isDev = !!process.env.VITE_DEV_SERVER_URL
@@ -73,6 +74,8 @@ function registerIpc() {
   ipcMain.handle('stream:pause', () => serial.streamPause())
   ipcMain.handle('stream:resume', () => serial.streamResume())
   ipcMain.handle('stream:stop', () => serial.streamStop())
+
+  registerArtworkIpc()
 }
 
 function subscribeEvents() {
