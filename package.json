@@ -18,8 +18,11 @@
     "lint": "oxlint",
     "start": "electron .",
     "preview": "vite preview",
-    "dist": "npm run build && electron-builder --win",
-    "dist:dir": "npm run build && electron-builder --win --dir"
+    "dist": "npm run build && electron-builder --win --x64",
+    "dist:dir": "npm run build && electron-builder --win --dir",
+    "clean": "rimraf dist dist-electron release .tmp",
+    "dist:msi": "npm run build && electron-builder --win msi --x64",
+    "dist:all": "npm run build && electron-builder --win nsis msi --x64"
   },
   "dependencies": {
     "lucide-react": "^1.57.0",
@@ -44,9 +47,9 @@
   },
   "build": {
     "appId": "com.lazeaway.desktop",
-    "productName": "Artilume S1 Desktop Controller",
+    "productName": "LazeAway",
     "artifactName": "LazeAway-${version}-Setup.${ext}",
-    "copyright": "Copyright © 2026 LazeAway",
+    "copyright": "Copyright \u00a9 2026 LazeAway",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -70,6 +73,12 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico"
@@ -89,11 +98,22 @@
       ],
       "hardenedRuntime": false
     },
-    "npmRebuild": false
+    "npmRebuild": false,
+    "asar": true,
+    "msi": {
+      "oneClick": false,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LazeAway"
+    }
   },
   "allowScripts": {
     "@serialport/bindings-cpp@13.0.0": true,
     "electron@38.8.6": true,
     "electron-winstaller@5.4.0": true
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
