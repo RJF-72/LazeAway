@@ -113,8 +113,8 @@ export function rasterGcode(
   const minS = 8
 
   const lines: string[] = []
-  lines.push('; Artilume S1 raster engraving')
-  lines.push('; Center origin: 0,0 = bed center. 150x200mm area.')
+  lines.push('; LazeAway raster engraving')
+  lines.push('; Workspace center origin: 0,0 = 150x200mm workspace center.')
   lines.push(
     `; image ${wPx}x${hPx}px -> ${widthMm.toFixed(1)}x${heightMm.toFixed(1)}mm ` +
       `@ ${dpi}dpi (row step ${rowStep}px), darkness ${darkness}${invert ? ' (inverted)' : ''}`,
@@ -262,6 +262,74 @@ export function rgbaToGray(rgba: Uint8ClampedArray, wPx: number, hPx: number): U
   const out = new Uint8ClampedArray(wPx * hPx)
   for (let i = 0, p = 0; i < out.length; i++, p += 4) {
     out[i] = 0.2126 * rgba[p] + 0.7152 * rgba[p + 1] + 0.0722 * rgba[p + 2]
+  }
+  return out
+}
+
+/**
+ * Convert a grayscale bitmap to a black-on-white edge outline (line art):
+ * Sobel edge magnitude, normalized, thresholded, then dilated so lines read
+ * at laser spot size. The base algorithm matches scripts/make-outline-pngs.py
+ * (photo mode), so in-app Outline matches the built-in picture templates.
+ *
+ * @param threshold edge cutoff on the 0..255 normalized magnitude (default 45).
+ *   Higher = fewer, bolder lines.
+ * @param thickness line weight in pixels, 1..5. 1 = thinnest (one dilation
+ *   pass, the classic outline); 5 = boldest. Values are clamped.
+ */
+export function toOutlineBitmap(
+  gray: Uint8ClampedArray | Uint8Array,
+  wPx: number,
+  hPx: number,
+  threshold = 45,
+  thickness = 1,
+): Uint8ClampedArray {
+  const n = wPx * hPx
+  const mag = new Float32Array(n)
+  let peak = 0
+  const at = (x: number, y: number): number => {
+    const cx = Math.max(0, Math.min(wPx - 1, x))
+    const cy = Math.max(0, Math.min(hPx - 1, y))
+    return gray[cy * wPx + cx]
+  }
+  for (let y = 0; y < hPx; y++) {
+    for (let x = 0; x < wPx; x++) {
+      const gx =
+        -at(x - 1, y - 1) + at(x + 1, y - 1) - 2 * at(x - 1, y) + 2 * at(x + 1, y) -
+        at(x - 1, y + 1) + at(x + 1, y + 1)
+      const gy =
+        -at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1) +
+        at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1)
+      const m = Math.sqrt(gx * gx + gy * gy)
+      mag[y * wPx + x] = m
+      if (m > peak) peak = m
+    }
+  }
+  const scale = peak > 0 ? 255 / peak : 0
+  const binary = new Uint8ClampedArray(n)
+  for (let i = 0; i < n; i++) {
+    binary[i] = mag[i] * scale > threshold ? 0 : 255
+  }
+  // Nx3 min-dilation passes: black ink spreads by one pixel per pass, so the
+  // operator can pick a 1..5px line weight that matches the laser spot size.
+  const passes = Math.max(1, Math.min(5, Math.round(thickness)))
+  let out = binary
+  for (let pass = 0; pass < passes; pass++) {
+    const next = new Uint8ClampedArray(n)
+    for (let y = 0; y < hPx; y++) {
+      for (let x = 0; x < wPx; x++) {
+        let v = 255
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const cx = Math.max(0, Math.min(wPx - 1, x + dx))
+            const cy = Math.max(0, Math.min(hPx - 1, y + dy))
+            v = Math.min(v, out[cy * wPx + cx])
+          }
+        }
+        next[y * wPx + x] = v
+      }
+    }
+    out = next
   }
   return out
 }

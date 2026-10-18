@@ -1,6 +1,6 @@
 {
-  "name": "artilume-s1-desktop-controller",
-  "productName": "Artilume S1 Desktop Controller",
+  "name": "lazeaway",
+  "productName": "LazeAway",
   "description": "Native desktop controller for the Artilume S1 6W Foldable Laser Engraver (ACMER S1 clone) - Texas Guitar Edition",
   "author": "LazeAway",
   "version": "1.0.0",
@@ -43,10 +43,10 @@
     "wait-on": "^9.5.1"
   },
   "build": {
-    "appId": "com.artilume.s1desktop",
+    "appId": "com.lazeaway.desktop",
     "productName": "Artilume S1 Desktop Controller",
-    "artifactName": "Artilume-S1-Desktop-Controller-${version}-Setup.${ext}",
-    "copyright": "Copyright © 2026 LazeAway - Texas Guitar Edition",
+    "artifactName": "LazeAway-${version}-Setup.${ext}",
+    "copyright": "Copyright © 2026 LazeAway",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -80,7 +80,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Artilume S1 Controller"
+      "shortcutName": "LazeAway"
     },
     "mac": {
       "category": "public.app-category.productivity",

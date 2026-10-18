@@ -17,6 +17,8 @@ import type { PhotoTone } from '@shared/photoTone'
 import type { TexasTemplate } from '@shared/texasTemplatesTypes'
 import type { Material } from '@shared/materialTypes'
 import type { LoadedArtwork } from './lib/artwork'
+import { setArtworkOutline, setImageOutlineThickness } from './lib/artwork'
+import { clampOutlineThickness, OUTLINE_DEFAULT_PX } from './lib/imageImport'
 
 const BED_W = 150
 const BED_H = 200
@@ -52,6 +54,8 @@ function Shell() {
   // Raster tone: 0 lightest .. 100 darkest, plus ink-direction flip.
   const [darkness, setDarkness] = useState(50)
   const [invert, setInvert] = useState(false)
+  // Outline (line art) line weight in pixels, 1 thin .. 5 bold.
+  const [outlinePx, setOutlinePx] = useState(OUTLINE_DEFAULT_PX)
 
   // Natural geometry before user sizing (vector jobs only).
   const naturalGeom = useMemo(() => {
@@ -138,10 +142,24 @@ function Shell() {
         setTemplate(null) // one active job at a time
         setTab('ENGRAVE')
       }
-      setArtwork(a)
+      setArtwork(a ? setImageOutlineThickness(a, outlinePx) : a)
     },
-    [],
+    [outlinePx],
   )
+
+  // Outline toggle: swap the active picture between its grayscale original
+  // and its edge-outline variant (bed preview + G-code follow together).
+  const onOutlineChange = useCallback((on: boolean) => {
+    setArtwork((a) => (a ? setArtworkOutline(a, on) : a))
+  }, [])
+
+  // Outline line weight: re-render the line-art variant at the new pixel
+  // size. Preview and G-code both read the active bitmap, so they track.
+  const onOutlinePx = useCallback((px: number) => {
+    const next = clampOutlineThickness(px)
+    setOutlinePx(next)
+    setArtwork((a) => (a ? setImageOutlineThickness(a, next) : a))
+  }, [])
 
   const onClearTemplate = useCallback(() => {
     setTemplate(null)
@@ -166,14 +184,14 @@ function Shell() {
       <header className="shrink-0 flex items-center gap-4 px-4 py-2.5 bg-[#1b1b1b] border-b border-[#3a3a3a]">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-[#ff6b35] flex items-center justify-center shadow-[0_0_18px_rgba(255,107,53,0.5)]">
-            <span className="text-black font-black text-lg">A</span>
+            <span className="text-black font-black text-lg">L</span>
           </div>
           <div className="leading-tight">
             <h1 className="text-[15px] font-bold text-white">
-              Artilume S1 Desktop Controller
+              LazeAway
             </h1>
             <p className="text-[10px] text-[#ff8c5c] tracking-[0.18em] font-semibold uppercase">
-              Texas Guitar Edition
+              Laser Control
             </p>
           </div>
         </div>
@@ -221,7 +239,7 @@ function Shell() {
 
             <Panel title="Template">
               <div className="flex flex-col gap-2">
-                <TemplateSelector defaultId={template?.id} onSelect={onSelectTemplate} />
+                <TemplateSelector selectedId={template?.id} onSelect={onSelectTemplate} />
                 {template && (
                   <div className="text-[11px] leading-relaxed">
                     <div className="font-semibold text-[#f5f5f5]">{template.name}</div>
@@ -305,6 +323,10 @@ function Shell() {
               onDarkness={setDarkness}
               invert={invert}
               onInvert={setInvert}
+              outline={artwork?.kind === 'image' ? artwork.outline : false}
+              onOutline={onOutlineChange}
+              outlinePx={outlinePx}
+              onOutlinePx={onOutlinePx}
             />
             <HeightIndicator />
             <WebcamMonitor tone={photoTone} />
@@ -315,7 +337,7 @@ function Shell() {
       {/* Footer */}
       <footer className="shrink-0 flex items-center justify-between px-4 py-1.5 bg-[#1b1b1b] border-t border-[#3a3a3a] text-[10px] text-[#6b7280]">
         <span>
-          Artilume S1 6W Foldable • ACMER S1 clone • offline, no internet required
+          LazeAway • 150×200mm GRBL Laser Controller
         </span>
         <span className="font-mono">
           {jobActive ? 'JOB ACTIVE' : 'IDLE'} • {connection.toUpperCase()}

@@ -4,7 +4,15 @@
 
 import type { TemplateGeometry } from '@shared/templateGeometry'
 import { parseSvg, type SvgImportResult } from './svgImport'
-import { loadImageFile, loadImageDataUrl, type LoadedImage } from './imageImport'
+import {
+  loadImageFile,
+  loadImageDataUrl,
+  loadImageFromSrc,
+  buildOutlineVariant,
+  clampOutlineThickness,
+  OUTLINE_DEFAULT_PX,
+  type LoadedImage,
+} from './imageImport'
 
 export interface VectorArtwork {
   kind: 'vector'
@@ -16,15 +24,88 @@ export interface VectorArtwork {
 export interface ImageArtwork {
   kind: 'image'
   name: string
-  /** Data URL for the bed preview and library storage. */
+  /** ACTIVE data URL for the bed preview (grayscale or outline variant). */
   dataUrl: string
-  /** Downscaled luminance bitmap, 0 black .. 255 white. */
+  /** ACTIVE luminance bitmap for G-code (0 black .. 255 white). */
   gray: Uint8ClampedArray
   wPx: number
   hPx: number
+  /** Grayscale original — the Outline-off variant. */
+  baseGray: Uint8ClampedArray
+  baseDataUrl: string
+  /** Edge-outline (line art) variant — the Outline-on variant. */
+  outlineGray: Uint8ClampedArray
+  outlineDataUrl: string
+  /** Line weight in pixels (1..5) used to build the outline variant. */
+  outlineThickness: number
+  /** True when the outline variant is the active one. */
+  outline: boolean
+  /** True for built-in picture templates (already outlines by nature). */
+  builtIn?: boolean
 }
 
 export type LoadedArtwork = VectorArtwork | ImageArtwork
+
+/**
+ * Return the artwork with the Outline mode applied (or un-applied). For
+ * images this swaps the active bitmap + preview between the grayscale
+ * original and the edge-outline variant, so what the bed shows is exactly
+ * what the G-code burns. Vectors pass through unchanged.
+ */
+export function setArtworkOutline(artwork: LoadedArtwork, outline: boolean): LoadedArtwork {
+  if (artwork.kind !== 'image' || artwork.outline === outline) return artwork
+  return {
+    ...artwork,
+    outline,
+    gray: outline ? artwork.outlineGray : artwork.baseGray,
+    dataUrl: outline ? artwork.outlineDataUrl : artwork.baseDataUrl,
+  }
+}
+
+/**
+ * Re-render the outline (line art) variant at a new line weight (1..5 px).
+ * The bed preview and the G-code both read the ACTIVE bitmap, so they follow
+ * the new weight together. Vectors and built-in pictures pass through.
+ */
+export function setImageOutlineThickness(
+  artwork: LoadedArtwork,
+  thickness: number,
+): LoadedArtwork {
+  if (artwork.kind !== 'image' || artwork.builtIn) return artwork
+  const px = clampOutlineThickness(thickness)
+  if (artwork.outlineThickness === px) return artwork
+  const { outlineGray, outlineDataUrl } = buildOutlineVariant(
+    artwork.baseGray,
+    artwork.wPx,
+    artwork.hPx,
+    px,
+  )
+  return {
+    ...artwork,
+    outlineGray,
+    outlineDataUrl,
+    outlineThickness: px,
+    gray: artwork.outline ? outlineGray : artwork.baseGray,
+    dataUrl: artwork.outline ? outlineDataUrl : artwork.baseDataUrl,
+  }
+}
+
+function imageArtworkFromLoaded(name: string, img: LoadedImage): ImageArtwork {
+  return {
+    kind: 'image',
+    name,
+    dataUrl: img.dataUrl,
+    gray: img.gray,
+    wPx: img.wPx,
+    hPx: img.hPx,
+    baseGray: img.gray,
+    baseDataUrl: img.dataUrl,
+    outlineGray: img.outlineGray,
+    outlineDataUrl: img.outlineDataUrl,
+    outlineThickness: img.outlineThickness ?? OUTLINE_DEFAULT_PX,
+    outline: false,
+  }
+}
 
 export type ArtworkLoadResult =
   | { ok: true; artwork: LoadedArtwork; warnings: string[]; downscaled: boolean }
@@ -42,14 +123,7 @@ export async function loadArtworkFromFile(file: File): Promise<ArtworkLoadResult
     const img: LoadedImage = await loadImageFile(file)
     return {
       ok: true,
-      artwork: {
-        kind: 'image',
-        name: file.name,
-        dataUrl: img.dataUrl,
-        gray: img.gray,
-        wPx: img.wPx,
-        hPx: img.hPx,
-      },
+      artwork: imageArtworkFromLoaded(file.name, img),
       warnings: img.downscaled
         ? [`Image downscaled to ${img.wPx}×${img.hPx}px for engraving.`]
         : [],
@@ -79,17 +153,42 @@ export async function loadArtworkFromLibrary(
     const img = await loadImageDataUrl(`data:${mime};base64,${bytesBase64}`)
     return {
       ok: true,
-      artwork: {
-        kind: 'image',
-        name,
-        dataUrl: img.dataUrl,
-        gray: img.gray,
-        wPx: img.wPx,
-        hPx: img.hPx,
-      },
+      artwork: imageArtworkFromLoaded(name, img),
       warnings: [],
       downscaled: img.downscaled,
     }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
+ * Load a built-in picture template. Built-ins are already outline line
+ * art, so both variants point at the same decoded bitmap — the Outline
+ * toggle is a no-op for them (and disabled in the UI).
+ */
+export async function loadArtworkFromSrc(
+  name: string,
+  src: string,
+): Promise<ArtworkLoadResult> {
+  try {
+    const img = await loadImageFromSrc(src)
+    const artwork: ImageArtwork = {
+      kind: 'image',
+      name,
+      dataUrl: img.dataUrl,
+      gray: img.gray,
+      wPx: img.wPx,
+      hPx: img.hPx,
+      baseGray: img.gray,
+      baseDataUrl: img.dataUrl,
+      outlineGray: img.gray,
+      outlineDataUrl: img.dataUrl,
+      outlineThickness: OUTLINE_DEFAULT_PX,
+      outline: false,
+      builtIn: true,
+    }
+    return { ok: true, artwork, warnings: [], downscaled: img.downscaled }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

@@ -1,32 +1,33 @@
-# React + TypeScript + Vite
+# LazeAway
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+LazeAway is an Electron + React desktop controller for GRBL-based diode lasers (150×200mm workspace). It provides artwork import, raster/photo engraving with tone control and outline mode, vector cutting, live connection/streaming with bounded in-flight buffering, jog controls, and a visual bed preview centered at workspace origin (0,0).
 
-Currently, two official plugins are available:
+## Features
+- Centered workspace (0,0 at dead center of 150×200mm bed)
+- GRBL streaming with RX-buffer-safe in-flight window (ok/error tracking)
+- Raster engraving with bidirectional scanlines, darkness/tone control, invert, outline mode
+- Vector artwork import (SVG) and raster (PNG/JPG/WebP/GIF/BMP)
+- Built-in Texas outline templates and picture outlines
+- Persistent artwork library (userData)
+- Connection, jog pad, console, G-code preview, test fire, emergency stop
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Development
 
-## React Compiler
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+\
+pm install\`n
 
-## Expanding the Oxlint configuration
+\
+pm run dev\`n
+## Build
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+\
+pm run build\`n
+\
+pm run dist\`n
+## Safety
+- Eye protection required for any active laser output. Never leave unattended.
+- USB-C data + 24V power both required on typical 6W/diode rigs.
+- Use in a ventilated area; follow local regulations.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.

@@ -3,7 +3,13 @@ import { useLaser } from '../hooks/useLaser'
 import { Btn, Panel } from './ui'
 import type { ArtworkEntry } from '@shared/types'
 import type { LoadedArtwork } from '../lib/artwork'
-import { loadArtworkFromFile, loadArtworkFromLibrary, dataUrlToBase64 } from '../lib/artwork'
+import {
+  loadArtworkFromFile,
+  loadArtworkFromLibrary,
+  loadArtworkFromSrc,
+  dataUrlToBase64,
+} from '../lib/artwork'
+import { BUILT_IN_PICTURES, type BuiltInPicture } from '../lib/builtInPictures'
 
 export interface ArtworkPanelProps {
   active: LoadedArtwork | null
@@ -88,6 +94,28 @@ export function ArtworkPanel({ active, onArtwork }: ArtworkPanelProps) {
     }
   }
 
+  const onLoadBuiltIn = async (picture: BuiltInPicture) => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await loadArtworkFromSrc(picture.name, picture.url)
+      if (!res.ok) {
+        setError(res.error)
+        pushLog(`Load failed: ${res.error}`, 'error')
+      } else {
+        onArtwork(res.artwork)
+        report(res.warnings)
+        pushLog(`Loaded "${picture.name}" (Texas picture • outline)`, 'info')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg)
+      pushLog(`Load failed: ${msg}`, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onLoadEntry = async (entry: ArtworkEntry) => {
     setBusy(true)
     setError(null)
@@ -151,9 +179,9 @@ export function ArtworkPanel({ active, onArtwork }: ArtworkPanelProps) {
             size="sm"
             disabled={busy}
             onClick={() => fileRef.current?.click()}
-            title="Import a picture (PNG/JPG) for photo engraving"
+            title="Import a photo from your computer (PNG/JPG) — shown colorless, Outline toggle in Cut Control"
           >
-            Import Picture…
+            Import Photo…
           </Btn>
         </div>
 
@@ -162,6 +190,40 @@ export function ArtworkPanel({ active, onArtwork }: ArtworkPanelProps) {
             {error}
           </div>
         )}
+
+        <div className="flex items-center justify-between mt-1">
+          <span className="panel-title">Texas pictures — outlines</span>
+          <span className="text-[10px] text-[#6b7280] font-mono">
+            {BUILT_IN_PICTURES.length}
+          </span>
+        </div>
+        <p className="text-[11px] text-[#6b7280] leading-relaxed">
+          Built-in colorless outlines — what you see is what the laser burns.
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {BUILT_IN_PICTURES.map((picture) => (
+            <button
+              key={picture.id}
+              type="button"
+              disabled={busy}
+              onClick={() => void onLoadBuiltIn(picture)}
+              title={`${picture.name} — ${picture.detail}. Click to load for engraving.`}
+              className="flex flex-col items-center gap-1 rounded-md bg-[#161616] border border-[#3a3a3a] px-1 py-2 hover:border-[#ff6b35] disabled:opacity-50"
+            >
+              <img
+                src={picture.url}
+                alt={`${picture.name} outline`}
+                className="w-full aspect-square object-contain rounded bg-white"
+              />
+              <span className="text-[10px] text-[#f5f5f5] font-semibold leading-tight text-center">
+                {picture.name}
+              </span>
+              <span className="text-[9px] text-[#6b7280] leading-tight text-center">
+                {picture.detail}
+              </span>
+            </button>
+          ))}
+        </div>
 
         <div className="flex items-center justify-between mt-1">
           <span className="panel-title">Saved library</span>

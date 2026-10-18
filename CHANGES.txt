@@ -1,0 +1,28 @@
+LazeAway — new stuff (commit c8f1146, Oct 17 2026)
+
+WHAT'S NEW
+- 3 built-in picture templates, all colorless outlines (black line art on white):
+  src/renderer/src/assets/bluebonnet-outline.png (Bluebonnet)
+  src/renderer/src/assets/cactus-outline.png (Prickly Pear Cactus)
+  src/renderer/src/assets/texas-outline.png (Texas Outline + Star)
+  They appear in the app under Artwork > "Texas pictures — outlines".
+- Import Photo button (renamed from Import Picture): any photo imported
+  from your computer now shows colorless on the bed, never in color.
+- Outline toggle in Cut Control: converts an imported photo to line art.
+  Bed preview and the burn follow together. Built-in pictures are already
+  outlines, so the toggle is off for them.
+- Bed preview forces grayscale so nothing can ever display in color.
+- scripts/make-outline-pngs.py regenerates the outline PNGs from photos.
+
+HOW TO USE THESE FILES
+This zip is the FULL repo at the new commit (all 84 files), not just the
+changed ones — unzip it and you have the whole working app source.
+Then: npm install (or npm ci), then npm run build.
+
+HOW TO GET IT ONTO GITHUB (safe way, no force-push)
+  git clone https://github.com/RJF-72/LazeAway.git
+  Copy everything from this unzipped folder OVER the clone (overwrite).
+  cd LazeAway
+  git add -A
+  git commit -m "Add colorless outline picture templates + Import Photo + Outline mode"
+  git push origin main

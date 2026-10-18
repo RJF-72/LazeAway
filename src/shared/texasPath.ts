@@ -1,11 +1,11 @@
 // Exact Texas guitar soundhole-cut outline path + helpers to convert to
 // center-origin points, optimize collinear segments and emit GRBL G-code.
 //
-// Coordinate reality for the Artilume S1: origin (0,0) is the CENTER of the
-// 150x200mm bed. The raw path below is authored in a 95mm-wide space where
-// x spans [0,95] and y spans [0,~82.92]. We center it by translating by
-// (-47.5, -41.46) so the shape straddles the machine origin, then optionally
-// scale about the origin for the 80mm variant.
+// Coordinate system: origin (0,0) is the CENTER of the
+// 150x200mm bed/workspace. The raw path below is authored in a 95mm-wide
+// space where x spans [0,95] and y spans [0,~82.92]. We center it by
+// translating by (-47.5, -41.46) so the shape straddles the workspace
+// center, then optionally scale about the origin for the 80mm variant.
 
 // Raw SVG path 'd' for the Texas soundhole cut (exact data supplied).
 export const TEXAS_PATH_D =
@@ -171,8 +171,8 @@ export function generateTexasGcode(scale = 1, opts: GcodeOptions): string[] {
 
   const start = pts[0]
   const lines: string[] = []
-  lines.push('; Artilume S1 Texas soundhole cut')
-  lines.push('; Center origin: 0,0 = bed center. 150x200mm area.')
+  lines.push('; LazeAway Texas soundhole cut')
+  lines.push('; Workspace center origin: 0,0 = 150x200mm workspace center.')
   lines.push('G90 G21')
   if (originAtStart) lines.push('G92 X0 Y0')
   lines.push(`M4 S${s}`) // M4 = dynamic laser (ramps on/off) - safer than M3 for motion

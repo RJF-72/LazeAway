@@ -33,7 +33,7 @@ export function ConnectionPanel() {
     disconnect,
     clearPorts,
     unlock,
-    homeToCenter,
+    goToWorkspaceCenter,
     runReconnectSequence,
   } = useLaser()
 
@@ -143,8 +143,8 @@ export function ConnectionPanel() {
           <Btn variant="warn" disabled={!connected} onClick={() => void unlock()}>
             UNLOCK $X
           </Btn>
-          <Btn variant="gantry" disabled={!connected} onClick={() => void homeToCenter()}>
-            HOME 0,0
+          <Btn variant="gantry" disabled={!connected} onClick={() => void goToWorkspaceCenter()}>
+            WORKSPACE CENTER (0,0)
           </Btn>
           <Btn variant="ghost" onClick={() => void clearPorts()}>
             CLEAR PORTS

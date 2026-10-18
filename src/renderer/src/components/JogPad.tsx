@@ -39,7 +39,7 @@ const LAYOUT: (Dir | 'center' | null)[] = [
 ]
 
 export function JogPad() {
-  const { jog, homeToCenter, connection, jogCancel } = useLaser()
+  const { jog, goToWorkspaceCenter, connection, jogCancel } = useLaser()
   const [distance, setDistance] = useState(10)
   const [feed, setFeed] = useState(1000)
   const disabled = connection !== 'connected'
@@ -141,8 +141,8 @@ export function JogPad() {
               <button
                 key={i}
                 disabled={disabled}
-                onClick={() => void homeToCenter()}
-                title="Home to center (0,0)"
+                onClick={() => void goToWorkspaceCenter()}
+                title="Go to workspace center (0,0)"
                 className="btn bg-[#1f2937] hover:bg-[#273447] border-[#3b82f6] text-[#93c5fd] h-12 text-lg disabled:opacity-40"
               >
                 ⌂

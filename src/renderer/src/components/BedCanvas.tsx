@@ -74,11 +74,13 @@ export function BedCanvas({
 
   // Picture preview: tone filter approximates the chosen darkness so the
   // operator sees light/dark before burning. Light→bright, dark→dim.
+  // grayscale(1) is a hard guarantee: the bed preview can never show
+  // color, even if a color image ever reaches this layer.
   const imageEl = useMemo(() => {
     if (!imagePreview) return null
     const { bounds, dataUrl, darkness, invert } = imagePreview
     const brightness = (1.55 - (darkness / 100) * 1.1).toFixed(2)
-    const filter = `brightness(${brightness}) contrast(1.05)${invert ? ' invert(1)' : ''}`
+    const filter = `grayscale(1) brightness(${brightness}) contrast(1.05)${invert ? ' invert(1)' : ''}`
     return (
       <image
         href={dataUrl}
@@ -95,7 +97,7 @@ export function BedCanvas({
 
   return (
     <Panel
-      title="Bed — Center Origin (0,0)"
+      title="Bed — Workspace Center (0,0)"
       right={
         <span className="text-[10px] text-[#6b7280] font-mono">
           {templateName ?? 'no template'} · ViewBox -75 -100 150 200
@@ -147,7 +149,7 @@ export function BedCanvas({
             </g>
             <circle cx={0} cy={0} r={1.1} fill="#ff6b35" />
             <text x={2.5} y={-2.5} fill="#ff6b35" fontSize={4} fontWeight={700}>
-              ORIGIN 0,0
+              WORKSPACE CENTER 0,0
             </text>
 
             {/* imported picture preview (SVG coords already y-flip-safe) */}

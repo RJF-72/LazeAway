@@ -39,7 +39,7 @@ export interface LaserCtx {
   sendRealtime: (char: string) => Promise<void>
 
   unlock: () => Promise<void>
-  homeToCenter: () => Promise<void>
+  goToWorkspaceCenter: () => Promise<void>
   runReconnectSequence: () => Promise<void>
 
   jog: (dx: number, dy: number, feed: number) => Promise<void>
@@ -158,11 +158,12 @@ export function LaserProvider({ children }: { children: ReactNode }) {
     pushLog('UNLOCK: soft-reset + $X sent', 'info')
   }, [send, sendRealtime, pushLog])
 
-  const homeToCenter = useCallback(async () => {
-    // G92 redefines current point as origin. Home here means "return to 0,0".
+  const goToWorkspaceCenter = useCallback(async () => {
+    // Workspace center is the bed center at origin (0,0). This is the
+    // dead center of the complete usable 150×200mm workspace.
     await send('G90')
     await send('G0 X0 Y0')
-    pushLog('HOME TO CENTER: G0 X0 Y0', 'info')
+    pushLog('GO TO WORKSPACE CENTER (0,0): G0 X0 Y0', 'info')
   }, [send, pushLog])
 
   const runReconnectSequence = useCallback(async () => {
@@ -235,7 +236,7 @@ export function LaserProvider({ children }: { children: ReactNode }) {
       sendLines,
       sendRealtime,
       unlock,
-      homeToCenter,
+      goToWorkspaceCenter,
       runReconnectSequence,
       jog,
       jogCancel,
@@ -263,7 +264,7 @@ export function LaserProvider({ children }: { children: ReactNode }) {
       sendLines,
       sendRealtime,
       unlock,
-      homeToCenter,
+      goToWorkspaceCenter,
       runReconnectSequence,
       jog,
       jogCancel,

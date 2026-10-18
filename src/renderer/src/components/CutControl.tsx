@@ -11,6 +11,9 @@ import type { LoadedArtwork } from '../lib/artwork'
 
 export type Tab = 'CUT' | 'ENGRAVE' | 'MARK'
 
+// Operational range
+
+
 export interface CutControlProps {
   template: TexasTemplate | null
   artwork: LoadedArtwork | null
@@ -29,6 +32,12 @@ export interface CutControlProps {
   onDarkness: (v: number) => void
   invert: boolean
   onInvert: (v: boolean) => void
+  /** Outline (line art) mode for picture jobs. */
+  outline: boolean
+  onOutline: (v: boolean) => void
+  /** Outline line weight in pixels (1 thin .. 5 bold). */
+  outlinePx: number
+  onOutlinePx: (v: number) => void
 }
 
 function fmtTime(ms: number): string {
@@ -55,6 +64,8 @@ export function CutControl({
   onDarkness,
   invert,
   onInvert,
+  outline,
+  onOutline,
 }: CutControlProps) {
   const {
     connection,
@@ -381,6 +392,25 @@ export function CutControl({
               />
               <span className="text-[11px] text-[#9ca3af]">
                 Invert (burn light areas instead)
+              </span>
+            </label>
+            <label
+              className="flex items-center gap-2 mt-2 cursor-pointer select-none"
+              title={
+                artwork?.kind === 'image' && artwork.builtIn
+                  ? 'Built-in pictures are already outlines'
+                  : 'Convert the picture to colorless line art — bed preview and burn follow together'
+              }
+            >
+              <input
+                type="checkbox"
+                checked={outline}
+                disabled={artwork?.kind === 'image' && artwork.builtIn}
+                onChange={(e) => onOutline(e.target.checked)}
+                className="accent-[#ff6b35] w-4 h-4"
+              />
+              <span className="text-[11px] text-[#9ca3af]">
+                Outline (line art — colorless edges)
               </span>
             </label>
             {rasterEstimate && (

@@ -22,7 +22,7 @@ function createWindow() {
     minHeight: 760,
     show: false,
     backgroundColor: '#121212',
-    title: 'Artilume S1 Desktop Controller - Texas Guitar Edition',
+    title: 'LazeAway - Laser Control',
     ...(existsSync(iconPath) ? { icon: iconPath } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
