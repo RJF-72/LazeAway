@@ -3,7 +3,7 @@
 // bounded in-flight window so the 128-byte GRBL RX buffer never overflows.
 import { SerialPort } from 'serialport'
 import { parseStatus, isOk, isError, describeError, RT } from '../shared/grbl'
-import { CONNECT_SEQUENCE } from '../shared/connectSequence'
+import { getConnectSequence, type MachineProfile, detectProfileFromPort } from '../shared/machineProfiles'
 import type {
   PortInfo,
   GrblStatus,
@@ -15,8 +15,8 @@ import type {
 
 export const BAUD_RATE = 115200
 
-// Settings applied automatically on connect live in shared/connectSequence.ts
-// (so the renderer can re-run the same sequence on demand).
+// Current machine profile (set on connect)
+let currentProfile: MachineProfile | null = null
 
 const MAX_IN_FLIGHT = 15 // max unacknowledged lines
 const MAX_IN_FLIGHT_BYTES = 90 // keep total unacked bytes < 128 RX buffer
@@ -97,8 +97,6 @@ export class SerialManager {
   async listPorts(): Promise<PortInfo[]> {
     const ports = await SerialPort.list()
     return ports.map((p) => {
-      // `friendlyName` exists at runtime on Windows but isn't in the public
-      // serialport type, so read it defensively.
       const friendly = (p as unknown as { friendlyName?: string }).friendlyName
       return {
         path: p.path,
@@ -116,7 +114,7 @@ export class SerialManager {
   }
 
   // ---- Connect / disconnect ----
-  async connect(path: string, baudRate = BAUD_RATE): Promise<{ ok: boolean; error?: string }> {
+  async connect(path: string, baudRate = BAUD_RATE): Promise<{ ok: boolean; error?: string; profile?: MachineProfile }> {
     if (this.port?.isOpen) await this.disconnect()
     this.emitState('connecting')
     return new Promise((resolve) => {
@@ -133,11 +131,25 @@ export class SerialManager {
         this.emitState('connected')
         this.emitLine(`connected ${path} @ ${baudRate}`, 'info')
         this.startPolling()
-        // Run the unlock / config sequence shortly after open.
-        setTimeout(() => {
-          this.runConnectSequence().catch(() => {})
-        }, 300)
-        resolve({ ok: true })
+        // Detect machine profile from port info
+        this.listPorts().then(ports => {
+          const portDetail = ports.find(p => p.path === path)
+          if (portDetail) {
+            currentProfile = detectProfileFromPort(portDetail) ?? null
+            if (currentProfile) {
+              this.emitLine(`Detected machine: ${currentProfile.name} (${currentProfile.manufacturer})`, 'info')
+            } else {
+              currentProfile = null
+              this.emitLine('No machine profile matched - using default Artilume S1 6W settings', 'info')
+            }
+            // Run the unlock / config sequence shortly after open.
+            setTimeout(() => {
+              this.runConnectSequence().catch(() => {})
+            }, 300)
+          }
+        })
+        
+        resolve({ ok: true, profile: currentProfile ?? undefined })
       })
     })
   }
@@ -152,11 +164,48 @@ export class SerialManager {
       this.stopPolling()
       this.emitState('disconnected')
       this.port = null
+      currentProfile = null
     })
   }
 
   private async runConnectSequence() {
-    for (const cmd of CONNECT_SEQUENCE) {
+    const defaultProfile = {
+      id: 'artilume-s1-6w',
+      name: 'Artilume S1 6W',
+      manufacturer: 'Artilume',
+      models: ['S1'],
+      laserPowerW: 6,
+      spindleMax: 1000,
+      spindleMin: 0,
+      bedWidthMm: 150,
+      bedHeightMm: 200,
+      originMode: 'center' as const,
+      reportMode: 0 as const,
+      defaultAcceleration: 300,
+      junctionDeviation: 0.01,
+      stepsPerMmX: 80,
+      stepsPerMmY: 80,
+      stepsPerMmZ: 800,
+      maxTravelX: 150,
+      maxTravelY: 200,
+      maxTravelZ: 40,
+      homingEnabled: false,
+      laserMode: 1 as const,
+      pwmFrequency: 1000,
+      softLimits: true,
+      hardLimits: false,
+      connectOverrides: ['$120=300', '$121=300'],
+      maxSafeCutSpeed: 500,
+      maxJogSpeed: 3000,
+      hasZAxis: true,
+      hasAirAssist: false,
+      notes: '',
+      vendorId: '1a86',
+      productId: '7523',
+      friendlyNameMatch: ['ch340', 'wch', 'usb serial'],
+    }
+    const sequence = currentProfile ? getConnectSequence(currentProfile) : getConnectSequence(defaultProfile)
+    for (const cmd of sequence) {
       await this.write(cmd + '\n', 'tx')
       await delay(40)
     }
@@ -168,6 +217,7 @@ export class SerialManager {
     const port = this.port
     if (!port) {
       this.emitState('disconnected')
+      currentProfile = null
       return
     }
     return new Promise((resolve) => {
@@ -175,9 +225,15 @@ export class SerialManager {
         this.port = null
         this.emitState('disconnected')
         this.emitLine('disconnected', 'info')
+        currentProfile = null
         resolve()
       })
     })
+  }
+
+  // Get current machine profile
+  getProfile(): MachineProfile | null {
+    return currentProfile
   }
 
   // ---- Low-level IO ----
@@ -434,6 +490,7 @@ export class SerialManager {
     this.inFlightBytes = 0
     this.inFlightSizes = []
     this.paused = false
+    this.stopped = false
     this.emitProgress()
   }
 }

@@ -49,7 +49,7 @@
     "appId": "com.lazeaway.desktop",
     "productName": "LazeAway",
     "artifactName": "LazeAway-${version}-Setup.${ext}",
-    "copyright": "Copyright \u00a9 2026 LazeAway",
+    "copyright": "Copyright © 2026 LazeAway",
     "directories": {
       "output": "release",
       "buildResources": "build"

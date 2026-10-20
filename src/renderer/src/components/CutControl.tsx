@@ -11,8 +11,30 @@ import type { LoadedArtwork } from '../lib/artwork'
 
 export type Tab = 'CUT' | 'ENGRAVE' | 'MARK'
 
-// Operational range
+// DPI presets for different engraving quality/speed tradeoffs
+export const DPI_PRESETS = [
+  { value: 150, label: '150 DPI - Fast, coarse' },
+  { value: 200, label: '200 DPI - Balanced' },
+  { value: 254, label: '254 DPI - 0.1mm interval' },
+  { value: 300, label: '300 DPI - Standard (default)' },
+  { value: 400, label: '400 DPI - Fine detail' },
+  { value: 508, label: '508 DPI - 0.05mm interval' },
+  { value: 600, label: '600 DPI - Very fine' },
+  { value: 1000, label: '1000 DPI - Ultra fine (slow)' },
+] as const
 
+// Shading/darkness presets for different materials
+export const DARKNESS_PRESETS = [
+  { value: 0, label: '0 - Lightest (highlights only)' },
+  { value: 15, label: '15 - Very light' },
+  { value: 30, label: '30 - Light' },
+  { value: 40, label: '40 - Light-Medium' },
+  { value: 50, label: '50 - Linear (default)' },
+  { value: 60, label: '60 - Medium-Dark' },
+  { value: 70, label: '70 - Dark' },
+  { value: 85, label: '85 - Very dark' },
+  { value: 100, label: '100 - Darkest (shadows only)' },
+] as const
 
 export interface CutControlProps {
   template: TexasTemplate | null
@@ -229,6 +251,40 @@ export function CutControl({
     await startStream(lines)
   }
 
+  // Frame with laser - burns the outline at low power
+  const doFrameLaser = async () => {
+    if (!geometry) {
+      pushLog('Load a template or artwork first.', 'error')
+      return
+    }
+    // Use low power (10%) and fast speed for marking the outline
+    const framePower = 10
+    const frameSpeed = 1000
+    const s = Math.round((framePower / 100) * 1000)
+    const b = geometry.bounds
+    
+    const lines: string[] = []
+    lines.push('; LazeAway frame outline with laser')
+    lines.push('; Workspace center origin: 0,0 = 150x200mm workspace center.')
+    lines.push('G90 G21')
+    lines.push('G92 X0 Y0')
+    lines.push(`M4 S${s}`)
+    lines.push(`G1 F${frameSpeed}`)
+    lines.push(`G0 X${b.minX.toFixed(3)} Y${b.minY.toFixed(3)}`)
+    lines.push(`G1 X${b.maxX.toFixed(3)} Y${b.minY.toFixed(3)}`)
+    lines.push(`G1 X${b.maxX.toFixed(3)} Y${b.maxY.toFixed(3)}`)
+    lines.push(`G1 X${b.minX.toFixed(3)} Y${b.maxY.toFixed(3)}`)
+    lines.push(`G1 X${b.minX.toFixed(3)} Y${b.minY.toFixed(3)}`)
+    lines.push('M5')
+    lines.push('G0 Z0')
+    lines.push('G0 X0 Y0')
+    lines.push('; done')
+    
+    onGcode(lines)
+    pushLog(`FRAME LASER: ${jobName ?? 'bounds'} — ${framePower}% power`, 'info')
+    await startStream(lines)
+  }
+
   // ---- Test fire: M3 Sxx for 2s then auto M5 ----
   const startTestFire = async (percent: number) => {
     if (testFire !== null) return
@@ -425,7 +481,7 @@ export function CutControl({
           </div>
         )}
 
-        {/* Presets + DPI */}
+        {/* Presets + DPI + Auto-configure */}
         <div className="grid grid-cols-2 gap-2">
           <Field label="Material preset">
             <select
@@ -442,17 +498,66 @@ export function CutControl({
             </select>
           </Field>
           <Field label="DPI" hint={`interval ${intervalMm.toFixed(4)} mm`}>
-            <input
-              className="field"
-              type="number"
-              min={50}
-              max={1000}
-              step={10}
-              value={dpi}
-              onChange={(e) => setDpi(Math.max(50, Number(e.target.value) || 300))}
-            />
+            <select className="field" value={dpi} onChange={(e) => setDpi(Number(e.target.value))}>
+              {DPI_PRESETS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
+
+        {/* Auto-configure from material + darkness/operation */}
+        {material && (
+          <Btn
+            variant="accent"
+            size="sm"
+            onClick={() => {
+              // Apply material settings adjusted for current operation and darkness
+              const basePower = material.power_percent
+              const baseSpeed = material.speed_mm_min
+              const basePasses = artworkIsImage ? 1 : material.passes
+              const baseZStep = material.z_step_per_pass_mm
+              const baseDpi = material.dpi
+              
+              // Adjust for darkness (engrave only)
+              let adjustedPower = basePower
+              if (tab === 'ENGRAVE' && isImage) {
+                // Scale power by darkness (0-100 -> 0.3-1.0 multiplier)
+                const darknessMult = 0.3 + (darkness / 100) * 0.7
+                adjustedPower = Math.round(basePower * darknessMult)
+              }
+              
+              setPower(adjustedPower)
+              setSpeed(baseSpeed)
+              setPasses(basePasses)
+              setZStep(baseZStep)
+              setDpi(baseDpi)
+              pushLog(`Auto-configured from "${material.name}" for ${tab} (darkness ${darkness})`, 'info')
+            }}
+            disabled={!connected}
+          >
+            ⚙ Auto-configure from material
+          </Btn>
+        )}
+
+        {/* Shading/Darkness presets for engrave */}
+        {isImage && (
+          <Field label="Darkness preset">
+            <select
+              className="field"
+              value={darkness}
+              onChange={(e) => onDarkness(Number(e.target.value))}
+            >
+              {DARKNESS_PRESETS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
 
         {/* Sliders */}
         <Slider label="Power" value={power} min={0} max={100} step={1} unit="%" onChange={setPower} />
@@ -480,7 +585,7 @@ export function CutControl({
         />
 
         {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <Btn
             variant="accent"
             size="lg"
@@ -496,6 +601,14 @@ export function CutControl({
             onClick={() => void doFrame()}
           >
             ⧉ FRAME
+          </Btn>
+          <Btn
+            variant="warn"
+            disabled={!connected || jobActive || !geometry}
+            onClick={() => void doFrameLaser()}
+            title="Burn the project outline at 10% power"
+          >
+            ⬟ FRAME LASER
           </Btn>
           <Btn variant="warn" disabled={!running} onClick={() => void pauseStream()}>
             ❙❙ PAUSE

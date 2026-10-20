@@ -10,6 +10,7 @@ import { GCodePanel } from './components/GCodePanel'
 import { TemplateSelector } from './components/TemplateSelector'
 import { MaterialSelector } from './components/MaterialSelector'
 import { ArtworkPanel } from './components/ArtworkPanel'
+import { TextEngravePanel } from './components/TextEngravePanel'
 import { Btn, Panel, StatusPill } from './components/ui'
 import { geometryForTemplate, scaleGeometry, type TemplateGeometry } from '@shared/templateGeometry'
 import { findMaterial, TEXAS_SPRUCE_DEFAULT } from '@shared/materialUtils'
@@ -19,6 +20,8 @@ import type { Material } from '@shared/materialTypes'
 import type { LoadedArtwork } from './lib/artwork'
 import { setArtworkOutline, setImageOutlineThickness } from './lib/artwork'
 import { clampOutlineThickness, OUTLINE_DEFAULT_PX } from './lib/imageImport'
+import { generateTextGcode, estimateTextEngraving, textToPaths } from '@shared/textEngrave'
+import type { Pt } from '@shared/texasPath'
 
 const BED_W = 150
 const BED_H = 200
@@ -39,7 +42,7 @@ export default function App() {
 }
 
 function Shell() {
-  const { connection, status, pushLog, send, sendRealtime, stopStream, jobActive } =
+  const { connection, status, pushLog, send, sendRealtime, stopStream, jobActive, startStream } =
     useLaser()
   const [template, setTemplate] = useState<TexasTemplate | null>(null)
   const [artwork, setArtwork] = useState<LoadedArtwork | null>(null)
@@ -56,6 +59,41 @@ function Shell() {
   const [invert, setInvert] = useState(false)
   // Outline (line art) line weight in pixels, 1 thin .. 5 bold.
   const [outlinePx, setOutlinePx] = useState(OUTLINE_DEFAULT_PX)
+
+  // Text engraving state
+  const [textEngraveText, setTextEngraveText] = useState('')
+  const [textEngraveFontSize, setTextEngraveFontSize] = useState(10)
+  const [textEngraveLetterSpacing, setTextEngraveLetterSpacing] = useState(1.0)
+  const [textEngraveLineSpacing, setTextEngraveLineSpacing] = useState(1.2)
+  const [textEngraveCenter, setTextEngraveCenter] = useState(true)
+  const [textEngraveMaxWidth, setTextEngraveMaxWidth] = useState(0)
+  const [textPreviewPaths, setTextPreviewPaths] = useState<Pt[][]>([])
+  const [textPreviewBounds, setTextPreviewBounds] = useState({ minX: 0, minY: 0, maxX: 0, maxY: 0, w: 0, h: 0 })
+
+  // Update text preview
+  const updateTextPreview = useCallback(() => {
+    if (!textEngraveText.trim()) {
+      setTextPreviewPaths([])
+      setTextPreviewBounds({ minX: 0, minY: 0, maxX: 0, maxY: 0, w: 0, h: 0 })
+      return
+    }
+    const result = textToPaths({
+      text: textEngraveText,
+      size: textEngraveFontSize,
+      letterSpacing: textEngraveLetterSpacing,
+      lineSpacing: textEngraveLineSpacing,
+      center: textEngraveCenter,
+      originMode: 'center',
+      maxWidth: textEngraveMaxWidth > 0 ? textEngraveMaxWidth : undefined,
+    })
+    setTextPreviewPaths(result.paths)
+    setTextPreviewBounds(result.bounds)
+  }, [textEngraveText, textEngraveFontSize, textEngraveLetterSpacing, textEngraveLineSpacing, textEngraveCenter, textEngraveMaxWidth])
+
+  // Update preview when text engraving inputs change
+  useEffect(() => {
+    updateTextPreview()
+  }, [updateTextPreview])
 
   // Natural geometry before user sizing (vector jobs only).
   const naturalGeom = useMemo(() => {
@@ -174,6 +212,51 @@ function Shell() {
     await stopStream()
     pushLog('⚠ EMERGENCY STOP — soft reset + M5 + G90', 'error')
   }, [send, sendRealtime, stopStream, pushLog])
+
+  // Text engraving handlers
+  const doTextFrame = useCallback(async () => {
+    if (!textPreviewPaths.length) {
+      pushLog('Enter text first to frame.', 'error')
+      return
+    }
+    const { generateBoundsFrame } = await import('@shared/texasPath')
+    const lines = generateBoundsFrame(textPreviewBounds, 1000)
+    setGcode(lines)
+    pushLog('FRAMING text bounds — laser off', 'info')
+    await startStream(lines)
+  }, [textPreviewPaths, textPreviewBounds, pushLog, startStream, setGcode])
+
+  const doTextStart = useCallback(async () => {
+    if (!textEngraveText.trim()) {
+      pushLog('Enter text to engrave.', 'error')
+      return
+    }
+    const speed = material?.speed_mm_min ?? 800
+    const power = material?.power_percent ?? 30
+    const passes = material?.passes ?? 1
+    const dpi = material?.dpi ?? 300
+    const lines = generateTextGcode({
+      text: textEngraveText,
+      size: textEngraveFontSize,
+      speed,
+      powerPercent: power,
+      passes,
+      dpi,
+      letterSpacing: textEngraveLetterSpacing,
+      lineSpacing: textEngraveLineSpacing,
+      center: textEngraveCenter,
+      originMode: 'center',
+      maxWidth: textEngraveMaxWidth > 0 ? textEngraveMaxWidth : undefined,
+      originAtStart: true,
+    })
+    setGcode(lines)
+    const estimate = estimateTextEngraving(textEngraveText, textEngraveFontSize, dpi)
+    pushLog(
+      `START: Text engrave "${textEngraveText.slice(0, 30)}${textEngraveText.length > 30 ? '...' : ''}" — ${lines.length} lines, ~${estimate.width.toFixed(1)}×${estimate.height.toFixed(1)}mm`,
+      'info',
+    )
+    await startStream(lines)
+  }, [textEngraveText, textEngraveFontSize, textEngraveLetterSpacing, textEngraveLineSpacing, textEngraveCenter, textEngraveMaxWidth, material, pushLog, startStream, setGcode])
 
   const connColor =
     connection === 'connected' ? 'ok' : connection === 'error' ? 'danger' : 'muted'
@@ -327,6 +410,27 @@ function Shell() {
               onOutline={onOutlineChange}
               outlinePx={outlinePx}
               onOutlinePx={onOutlinePx}
+            />
+            <TextEngravePanel
+              text={textEngraveText}
+              onTextChange={setTextEngraveText}
+              fontSize={textEngraveFontSize}
+              onFontSizeChange={setTextEngraveFontSize}
+              letterSpacing={textEngraveLetterSpacing}
+              onLetterSpacingChange={setTextEngraveLetterSpacing}
+              lineSpacing={textEngraveLineSpacing}
+              onLineSpacingChange={setTextEngraveLineSpacing}
+              center={textEngraveCenter}
+              onCenterChange={setTextEngraveCenter}
+              maxWidth={textEngraveMaxWidth}
+              onMaxWidthChange={setTextEngraveMaxWidth}
+              previewPaths={textPreviewPaths}
+              previewBounds={textPreviewBounds}
+              _material={material}
+              connected={connection === 'connected'}
+              jobActive={jobActive}
+              onFrame={doTextFrame}
+              onStart={doTextStart}
             />
             <HeightIndicator />
             <WebcamMonitor tone={photoTone} />
