@@ -131,24 +131,46 @@ export class SerialManager {
         this.emitState('connected')
         this.emitLine(`connected ${path} @ ${baudRate}`, 'info')
         this.startPolling()
-        // Detect machine profile from port info
-        this.listPorts().then(ports => {
-          const portDetail = ports.find(p => p.path === path)
-          if (portDetail) {
-            currentProfile = detectProfileFromPort(portDetail) ?? null
-            if (currentProfile) {
-              this.emitLine(`Detected machine: ${currentProfile.name} (${currentProfile.manufacturer})`, 'info')
-            } else {
+        // Unlock / config sequence ($X, $32=1 laser mode, …) runs off the
+        // port we just opened — unconditionally. Profile detection via a
+        // second port scan is best-effort only: if the scan fails or
+        // doesn't return this port, we fall back to the default profile
+        // instead of silently skipping the sequence (which left the board
+        // alarm-locked with laser mode off, so jobs "ran" but cut nothing).
+        setTimeout(() => {
+          void (async () => {
+            try {
+              const ports = await this.listPorts()
+              const portDetail = ports.find((p) => p.path === path)
+              if (portDetail) {
+                currentProfile = detectProfileFromPort(portDetail) ?? null
+                if (currentProfile) {
+                  this.emitLine(`Detected machine: ${currentProfile.name} (${currentProfile.manufacturer})`, 'info')
+                } else {
+                  this.emitLine('No machine profile matched - using default Artilume S1 6W settings', 'info')
+                }
+              } else {
+                currentProfile = null
+                this.emitLine('Port re-scan did not return the opened port - using default Artilume S1 6W settings', 'info')
+              }
+            } catch (e) {
               currentProfile = null
-              this.emitLine('No machine profile matched - using default Artilume S1 6W settings', 'info')
+              this.emitLine(
+                `Machine profile detection failed: ${e instanceof Error ? e.message : String(e)} - using default Artilume S1 6W settings`,
+                'error',
+              )
             }
-            // Run the unlock / config sequence shortly after open.
-            setTimeout(() => {
-              this.runConnectSequence().catch(() => {})
-            }, 300)
-          }
-        })
-        
+            try {
+              await this.runConnectSequence()
+            } catch (e) {
+              this.emitLine(
+                `Connect sequence FAILED: ${e instanceof Error ? e.message : String(e)} - the board may still be alarm-locked; press UNLOCK before running a job.`,
+                'error',
+              )
+            }
+          })()
+        }, 300)
+
         resolve({ ok: true, profile: currentProfile ?? undefined })
       })
     })

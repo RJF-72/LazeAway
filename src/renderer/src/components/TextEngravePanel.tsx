@@ -22,6 +22,8 @@ export interface TextEngravePanelProps {
   jobActive: boolean
   onFrame: () => void
   onStart: () => void
+  /** Offline creation: build the text G-code with no laser connected. */
+  onGenerate: () => void
 }
 
 export function TextEngravePanel({
@@ -44,6 +46,7 @@ export function TextEngravePanel({
   jobActive,
   onFrame,
   onStart,
+  onGenerate,
 }: TextEngravePanelProps) {
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onTextChange(e.target.value)
@@ -152,6 +155,17 @@ export function TextEngravePanel({
             </div>
           </div>
         )}
+
+        {/* Offline generation — creating the design never needs the laser */}
+        <Btn
+          variant="ok"
+          className="w-full py-2.5"
+          disabled={jobActive || !text.trim()}
+          onClick={onGenerate}
+          title="Build the text G-code — works with no laser connected"
+        >
+          ⚙ GENERATE G-CODE
+        </Btn>
 
         <div className="grid grid-cols-2 gap-2">
           <Btn

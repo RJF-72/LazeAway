@@ -118,9 +118,18 @@ export function LaserProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refreshPorts = useCallback(async () => {
-    const list = await window.laser.listPorts()
-    setPorts(list)
-  }, [])
+    try {
+      const list = await window.laser.listPorts()
+      setPorts(list)
+    } catch (e) {
+      // A failed scan must not look like "no laser exists" — say what broke.
+      pushLog(
+        `Port scan failed: ${e instanceof Error ? e.message : String(e)} — no COM ports shown. ` +
+          'Check the USB cable and the CH340 driver, then scan again.',
+        'error',
+      )
+    }
+  }, [pushLog])
 
   const connect = useCallback(
     async (path: string) => {

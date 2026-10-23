@@ -214,28 +214,12 @@ function Shell() {
   }, [send, sendRealtime, stopStream, pushLog])
 
   // Text engraving handlers
-  const doTextFrame = useCallback(async () => {
-    if (!textPreviewPaths.length) {
-      pushLog('Enter text first to frame.', 'error')
-      return
-    }
-    const { generateBoundsFrame } = await import('@shared/texasPath')
-    const lines = generateBoundsFrame(textPreviewBounds, 1000)
-    setGcode(lines)
-    pushLog('FRAMING text bounds — laser off', 'info')
-    await startStream(lines)
-  }, [textPreviewPaths, textPreviewBounds, pushLog, startStream, setGcode])
-
-  const doTextStart = useCallback(async () => {
-    if (!textEngraveText.trim()) {
-      pushLog('Enter text to engrave.', 'error')
-      return
-    }
+  const buildTextGcodeLines = useCallback(() => {
     const speed = material?.speed_mm_min ?? 800
     const power = material?.power_percent ?? 30
     const passes = material?.passes ?? 1
     const dpi = material?.dpi ?? 300
-    const lines = generateTextGcode({
+    return generateTextGcode({
       text: textEngraveText,
       size: textEngraveFontSize,
       speed,
@@ -249,14 +233,66 @@ function Shell() {
       maxWidth: textEngraveMaxWidth > 0 ? textEngraveMaxWidth : undefined,
       originAtStart: true,
     })
+  }, [textEngraveText, textEngraveFontSize, textEngraveLetterSpacing, textEngraveLineSpacing, textEngraveCenter, textEngraveMaxWidth, material])
+
+  // Stream errors must reach the on-screen log, not die silently.
+  const streamTextOrLog = useCallback(
+    async (lines: string[]) => {
+      try {
+        await startStream(lines)
+      } catch (e) {
+        pushLog(
+          `Could not send the text job to the laser: ${e instanceof Error ? e.message : String(e)}`,
+          'error',
+        )
+      }
+    },
+    [startStream, pushLog],
+  )
+
+  const doTextFrame = useCallback(async () => {
+    if (!textPreviewPaths.length) {
+      pushLog('Enter text first to frame.', 'error')
+      return
+    }
+    const { generateBoundsFrame } = await import('@shared/texasPath')
+    const lines = generateBoundsFrame(textPreviewBounds, 1000)
+    setGcode(lines)
+    pushLog('FRAMING text bounds — laser off', 'info')
+    await streamTextOrLog(lines)
+  }, [textPreviewPaths, textPreviewBounds, pushLog, streamTextOrLog, setGcode])
+
+  // Offline creation: build the text G-code with NO laser connected.
+  const doTextGenerate = useCallback(() => {
+    if (!textEngraveText.trim()) {
+      pushLog('Enter text to engrave.', 'error')
+      return
+    }
+    const dpi = material?.dpi ?? 300
+    const lines = buildTextGcodeLines()
+    setGcode(lines)
+    const estimate = estimateTextEngraving(textEngraveText, textEngraveFontSize, dpi)
+    pushLog(
+      `GENERATED: Text "${textEngraveText.slice(0, 30)}${textEngraveText.length > 30 ? '...' : ''}" — ${lines.length} lines of G-code, ~${estimate.width.toFixed(1)}×${estimate.height.toFixed(1)}mm. Export it from the G-Code panel, or connect the laser and press ENGRAVE TEXT.`,
+      'info',
+    )
+  }, [textEngraveText, textEngraveFontSize, material, buildTextGcodeLines, pushLog, setGcode])
+
+  const doTextStart = useCallback(async () => {
+    if (!textEngraveText.trim()) {
+      pushLog('Enter text to engrave.', 'error')
+      return
+    }
+    const dpi = material?.dpi ?? 300
+    const lines = buildTextGcodeLines()
     setGcode(lines)
     const estimate = estimateTextEngraving(textEngraveText, textEngraveFontSize, dpi)
     pushLog(
       `START: Text engrave "${textEngraveText.slice(0, 30)}${textEngraveText.length > 30 ? '...' : ''}" — ${lines.length} lines, ~${estimate.width.toFixed(1)}×${estimate.height.toFixed(1)}mm`,
       'info',
     )
-    await startStream(lines)
-  }, [textEngraveText, textEngraveFontSize, textEngraveLetterSpacing, textEngraveLineSpacing, textEngraveCenter, textEngraveMaxWidth, material, pushLog, startStream, setGcode])
+    await streamTextOrLog(lines)
+  }, [textEngraveText, textEngraveFontSize, material, buildTextGcodeLines, pushLog, streamTextOrLog, setGcode])
 
   const connColor =
     connection === 'connected' ? 'ok' : connection === 'error' ? 'danger' : 'muted'
@@ -431,6 +467,7 @@ function Shell() {
               jobActive={jobActive}
               onFrame={doTextFrame}
               onStart={doTextStart}
+              onGenerate={doTextGenerate}
             />
             <HeightIndicator />
             <WebcamMonitor tone={photoTone} />

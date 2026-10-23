@@ -3,7 +3,7 @@
   "productName": "LazeAway",
   "description": "Native desktop controller for the Artilume S1 6W Foldable Laser Engraver (ACMER S1 clone) - Texas Guitar Edition",
   "author": "LazeAway",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "private": true,
   "main": "dist-electron/main/index.js",

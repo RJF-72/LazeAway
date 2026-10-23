@@ -218,6 +218,42 @@ export function CutControl({
     )
   }
 
+  // Stream errors (e.g. the port dropped after the UI last saw it) must
+  // reach the on-screen log instead of dying as unhandled rejections.
+  const streamOrLog = async (lines: string[]) => {
+    try {
+      await startStream(lines)
+    } catch (e) {
+      pushLog(
+        `Could not send the job to the laser: ${e instanceof Error ? e.message : String(e)}`,
+        'error',
+      )
+    }
+  }
+
+  // Offline creation: build the design's G-code with NO laser connected.
+  // Generation never needed the machine — only streaming does.
+  const doGenerate = () => {
+    if (!jobName) {
+      pushLog('Select a template or import your own artwork first.', 'error')
+      return
+    }
+    if (isImage && (!artwork || artwork.kind !== 'image')) return
+    if (!isImage && (!geometry || geometry.paths.length === 0)) {
+      pushLog(`"${jobName}" has no vector artwork yet — nothing to generate.`, 'error')
+      return
+    }
+    const lines = buildGcode()
+    if (!lines) return
+    onGcode(lines)
+    pushLog(
+      `GENERATED: ${jobName} — ${lines.length} lines of G-code (${tab}` +
+        (isImage ? `, ${rasterEstimate?.scanlines ?? '?'} scanlines, darkness ${darkness}` : '') +
+        '). Export it from the G-Code panel, or connect the laser and press START.',
+      'info',
+    )
+  }
+
   const doStart = async () => {
     if (!jobName) {
       pushLog('Select a template or import your own artwork first.', 'error')
@@ -237,7 +273,7 @@ export function CutControl({
         ')',
       'info',
     )
-    await startStream(lines)
+    await streamOrLog(lines)
   }
 
   const doFrame = async () => {
@@ -248,7 +284,7 @@ export function CutControl({
     const lines = generateBoundsFrame(geometry.bounds, 1000)
     onGcode(lines)
     pushLog(`FRAME: ${jobName ?? 'bounds'} — laser off`, 'info')
-    await startStream(lines)
+    await streamOrLog(lines)
   }
 
   // Frame with laser - burns the outline at low power
@@ -282,7 +318,7 @@ export function CutControl({
     
     onGcode(lines)
     pushLog(`FRAME LASER: ${jobName ?? 'bounds'} — ${framePower}% power`, 'info')
-    await startStream(lines)
+    await streamOrLog(lines)
   }
 
   // ---- Test fire: M3 Sxx for 2s then auto M5 ----
@@ -584,7 +620,19 @@ export function CutControl({
           decimals={2}
         />
 
-        {/* Action buttons */}
+        {/* Offline generation — creating a design never needs the laser */}
+        <Btn
+          variant="ok"
+          size="lg"
+          className="w-full py-2.5"
+          disabled={jobActive || !geometry}
+          onClick={doGenerate}
+          title="Build the G-code for the current design — works with no laser connected"
+        >
+          ⚙ GENERATE G-CODE
+        </Btn>
+
+        {/* Action buttons (streaming — these do need the laser) */}
         <div className="grid grid-cols-3 gap-2">
           <Btn
             variant="accent"
@@ -623,8 +671,8 @@ export function CutControl({
 
         {!jobName && (
           <div className="text-[11px] text-[#eab308]">
-            Select a template or import your own artwork (SVG / picture) to enable START /
-            FRAME.
+            Select a template or import your own artwork (SVG / picture) to enable GENERATE /
+            START / FRAME.
           </div>
         )}
         {jobName && !geometry && (

@@ -41,7 +41,7 @@ export function GCodePanel({ lines }: { lines: string[] }) {
           readOnly
           value={lines.join('\n')}
           spellCheck={false}
-          placeholder="G-code appears here when you START or FRAME a job, or load a template."
+          placeholder="G-code appears here when you press GENERATE G-CODE, or START / FRAME a job."
           className="field w-full h-[180px] resize-none text-[11px] leading-[1.45] whitespace-pre overflow-auto"
         />
         <div className="flex gap-2">
