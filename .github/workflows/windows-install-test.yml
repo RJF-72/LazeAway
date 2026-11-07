@@ -1,0 +1,107 @@
+# LazeAway — Windows install test (PREPARED Oct 26, 2026 — NOT pushed)
+#
+# Target location when approved: RJF-72/LazeAway/.github/workflows/windows-install-test.yml
+# Trigger: manual (workflow_dispatch) only. Nothing runs until someone pushes
+# this file AND presses "Run workflow" (or dispatches it via API).
+#
+# What this proves on a real windows-latest runner:
+#   - Source at main (80018e0, v1.0.1) typechecks + builds on Windows
+#   - electron-builder produces the win-unpacked payload on Windows
+#   - A placeholder-identity MSIX packed with the Windows SDK's makeappx.exe
+#     (same AppxManifest.xml as staging/, identity LazeAway.Placeholder /
+#     CN=PLACEHOLDER-Publisher-LazeAway, PublisherDisplayName "Joni Flanary")
+#   - Self-sign per WINDOWS-TEST.md §1–2, Add-AppxPackage install (§3),
+#     Start-menu/launch + process-alive check (§4, automated subset),
+#     clean uninstall (§6)
+#
+# What this does NOT prove (named, not hidden):
+#   - The exact shipped file LazeAway-1.0.1.0.msix (Linux-packed) cannot be the
+#     test subject here: it is 145,995,769 bytes — over GitHub's 100 MB git
+#     file limit — and is not in the repo. This workflow tests a Windows-packed
+#     equivalent from the same source + same manifest. Testing the shipped
+#     bytes requires handing the .msix to a Windows machine directly
+#     (WINDOWS-TEST.md as written).
+#   - The UI click-through G-code checks (1,019 / 661 lines) — the offline
+#     harness (tools/offline-harness.cjs) has Linux paths baked in. It passed
+#     11/11 on Linux Oct 26, 2026; a Windows port is a follow-up.
+#   - Serial/COM connection to a real Artilume S1 engraver (WINDOWS-TEST.md
+#     §5). No CI runner has the hardware. RAY-HARDWARE BLOCKER.
+
+name: windows-install-test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  install-test:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install + typecheck + unit checks
+        shell: pwsh
+        run: |
+          npm ci
+          npm run typecheck
+          node scripts/check-raster.mjs
+
+      - name: Build Windows payload (win-unpacked)
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm run build
+          npx electron-builder --win --dir -c.win.signAndEditExecutable=false
+
+      - name: Stage MSIX (payload + manifest + assets)
+        shell: pwsh
+        run: |
+          # Assets + AppxManifest.xml must be committed alongside this workflow
+          # under .github/msix/ (copied from
+          # microsoft-store-submissions/lazeaway/staging/) — see setup report.
+          Copy-Item release/win-unpacked/* msix-stage/ -Recurse
+          Copy-Item .github/msix/AppxManifest.xml msix-stage/
+          Copy-Item .github/msix/Assets msix-stage/Assets -Recurse
+
+      - name: Pack + self-sign (placeholder identity, per WINDOWS-TEST.md)
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe" | Select-Object -First 1
+          & $sdk.FullName pack /d msix-stage /p LazeAway-1.0.1.0.msix /nv
+          $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=PLACEHOLDER-Publisher-LazeAway" `
+            -KeyUsage DigitalSignature -FriendlyName "LazeAway placeholder test cert" `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+          Export-PfxCertificate -Cert $cert -FilePath .\LazeAwayTest.pfx -Password (ConvertTo-SecureString -String "test" -Force -AsPlainText) | Out-Null
+          Import-PfxCertificate -FilePath .\LazeAwayTest.pfx -Password (ConvertTo-SecureString -String "test" -Force -AsPlainText) -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -First 1
+          & $signtool.FullName sign /fd SHA256 /f LazeAwayTest.pfx /p test LazeAway-1.0.1.0.msix
+
+      - name: Install MSIX (WINDOWS-TEST.md §3)
+        shell: pwsh
+        run: Add-AppxPackage -Path .\LazeAway-1.0.1.0.msix
+
+      - name: Launch + alive check (§4 automated subset)
+        shell: pwsh
+        run: |
+          $pkg = Get-AppxPackage -Name LazeAway.Placeholder
+          if (-not $pkg) { throw "Package not installed" }
+          Start-Process "shell:AppsFolder\$($pkg.PackageFamilyName)!LazeAway"
+          Start-Sleep -Seconds 20
+          $proc = Get-Process LazeAway -ErrorAction SilentlyContinue
+          if (-not $proc) { throw "LazeAway process not running after launch" }
+          Write-Host "PASS: installed and launched; process alive after 20s"
+
+      - name: Uninstall cleanliness (§6)
+        if: always()
+        shell: pwsh
+        run: |
+          Get-AppxPackage -Name LazeAway.Placeholder | Remove-AppxPackage
+          if (Get-AppxPackage -Name LazeAway.Placeholder) { throw "Uninstall left package behind" }
+          Write-Host "PASS: uninstall clean"

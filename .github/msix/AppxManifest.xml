@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LazeAway 1.0.1 — Microsoft Store MSIX manifest (full-trust Win32 / Desktop Bridge style)
+
+  !!! PLACEHOLDER IDENTITY — DO NOT SUBMIT THIS EXACT PACKAGE !!!
+  Package Name "LazeAway.Placeholder" and Publisher "CN=PLACEHOLDER-Publisher-LazeAway"
+  are stand-ins. The FINAL pack must be regenerated after Joni Flanary's Partner
+  Center account reserves the app, using the real values Partner Center issues:
+    Identity Name    = the reserved Package Name from Partner Center
+    Identity Publisher = the Publisher string (CN=...) from Partner Center
+  PublisherDisplayName "Joni Flanary" is REAL (publisher of record, per Ray Oct 24).
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
+
+  <Identity
+    Name="LazeAway.Placeholder"
+    Publisher="CN=PLACEHOLDER-Publisher-LazeAway"
+    Version="1.0.1.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>LazeAway</DisplayName>
+    <PublisherDisplayName>Joni Flanary</PublisherDisplayName>
+    <Logo>Assets\Square150x150Logo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="LazeAway" Executable="LazeAway.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="LazeAway"
+        Description="Desktop controller for GRBL diode laser engravers (Artilume S1 / ACMER S1 class) — Texas templates, materials library, offline G-code generation and .nc export."
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        BackgroundColor="transparent">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square310x310Logo="Assets\Square310x310Logo.png" ShortName="LazeAway" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Full-trust Win32 (Electron) entry point -->
+    <rescap:Capability Name="runFullTrust" />
+    <!-- Serial/COM access so the packaged app can reach the engraver's USB serial port.
+         NOTE: must be confirmed in the real-Windows test (WINDOWS-TEST.md) — a packaged
+         app also needs the user's device access consent at first use. -->
+    <DeviceCapability Name="serialcommunication">
+      <Device Id="any">
+        <Function Type="name:serialPort" />
+      </Device>
+    </DeviceCapability>
+  </Capabilities>
+
+</Package>
