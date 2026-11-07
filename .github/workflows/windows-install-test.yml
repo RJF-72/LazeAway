@@ -69,6 +69,10 @@ jobs:
           # Assets + AppxManifest.xml must be committed alongside this workflow
           # under .github/msix/ (copied from
           # microsoft-store-submissions/lazeaway/staging/) — see setup report.
+          # Create the stage dir first: Copy-Item src/* dest/ with a missing
+          # dest mis-copies ("Container cannot be copied onto existing leaf
+          # item" - run 42405430470). (Nov 7 fix)
+          New-Item -ItemType Directory -Force msix-stage | Out-Null
           Copy-Item release/win-unpacked/* msix-stage/ -Recurse
           Copy-Item .github/msix/AppxManifest.xml msix-stage/
           Copy-Item .github/msix/Assets msix-stage/Assets -Recurse
