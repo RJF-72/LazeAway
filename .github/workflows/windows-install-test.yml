@@ -61,7 +61,7 @@ jobs:
         run: |
           npm run build
           node scripts/check-raster.mjs
-          npx electron-builder --win --dir -c.win.signAndEditExecutable=false
+          npx electron-builder --win --dir "-c.win.signAndEditExecutable=false"
 
       - name: Stage MSIX (payload + manifest + assets)
         shell: pwsh
