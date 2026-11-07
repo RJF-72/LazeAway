@@ -49,7 +49,10 @@ jobs:
         run: |
           npm ci
           npm run typecheck
-          node scripts/check-raster.mjs
+          # NOTE (Nov 7 fix): scripts/check-raster.mjs imports
+          # ../dist-electron/shared/rasterEngrave.js, which only exists after
+          # build:electron runs - so the raster check moved to the build step
+          # below (on the Oct 26 Linux run the tree was already built).
 
       - name: Build Windows payload (win-unpacked)
         shell: pwsh
@@ -57,6 +60,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           npm run build
+          node scripts/check-raster.mjs
           npx electron-builder --win --dir -c.win.signAndEditExecutable=false
 
       - name: Stage MSIX (payload + manifest + assets)
